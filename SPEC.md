@@ -647,7 +647,6 @@ still holds and goes below zero. That order is what keeps `is_frontier` and
 
 > Corrected after handoff, in commit 77291e2. The handed-off text lowered the
 > count above the `expanded[c]` check, and a maze with loops then underflows it.
-> This is the one change made to this document after the freeze.
 
 Manhattan distance is admissible here: a step between two adjacent cells costs
 1, and a wall can only make the true path longer than the straight-line count.
@@ -765,9 +764,7 @@ pub struct App {
     pub braid_factor: f64,
     pub generator_ix: usize,        // index into GENERATORS
     pub solver_ix: usize,           // index into SOLVERS
-    pub generator: Option<Box<dyn Generator>>,
-    pub solver: Option<Box<dyn Solver>>,
-    pub run: Option<Run>,           // this run
+    pub run: Option<Run>,           // this run, and the algorithm it runs
     pub previous: Option<RunStats>, // previous run, section 8
     pub budget: StepBudget,
     pub ascii: bool,
@@ -780,6 +777,16 @@ pub struct App {
 size: the loop measures time and passes a `Duration` in, and the renderer reads
 the size from the frame. This is the one-way rule of ADR 0006 applied to the
 state machine.
+
+The two index fields hold the **selection**, which is what the next `g` or `s`
+runs. `run` holds what is running, together with the algorithm box, because the
+cell-state functions of section 7.3 take the maze and nothing else.
+
+> Corrected after handoff, in commit f23fe2b. The handed-off struct held
+> `generator: Option<Box<dyn Generator>>` and `solver: Option<Box<dyn Solver>>`
+> beside `run`. Section 7.3 gives `solver_state` and `gen_state` no argument
+> that could carry an algorithm, so a `Run` has to own one, and the two fields
+> would have been a second owner of one box.
 
 ---
 
@@ -1075,8 +1082,19 @@ connected line, so a passage between two path cells is `Path`. An expanded
 region has to read as a region, so a passage between two expanded cells is
 `Expanded`. The **frontier** must stay a thin ring, and it does: a frontier
 cell's neighbour is almost always expanded, so the passage takes `Expanded`, the
-weaker of the two. In generation every passage joins two carved cells and both
-project to `Carved`, so every passage is `Carved`.
+weaker of the two. In generation the non-positional walk begins at `Frontier`,
+and what it gives a passage depends on what the generator holds in its
+frontier. The frontier of Randomized Prim holds uncarved cells, and a passage
+joins two carved cells, so every passage of that run is `Carved`. The frontier
+of the Recursive Backtracker is its stack and a stack cell is carved, so the
+corridor it is walking reads as one `Frontier` line. That is the same
+contiguity the rule is for.
+
+> Corrected after handoff, in commit f23fe2b. The handed-off text said that in
+> generation every passage joins two carved cells, so every passage is
+> `Carved`. That holds for Randomized Prim alone. Reading it as a rule would
+> put a `Carved` gap between every two cells of the Recursive Backtracker's
+> stack, and the corridor the run is walking would draw as a dotted line.
 
 `DisplayCell::Wall` resolves to `Wall` and `Uncarved` respectively.
 
