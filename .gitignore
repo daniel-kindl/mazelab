@@ -1,2 +1,5 @@
 # Agent worktrees and local Claude Code state.
 .claude/
+
+# Build output.
+/target

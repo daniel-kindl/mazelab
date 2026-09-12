@@ -1,0 +1,1 @@
+//! The breadth-first solver.
