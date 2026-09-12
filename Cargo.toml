@@ -24,3 +24,11 @@ expect_used = "warn"
 # for backticks around it in every doc comment, which would make the prose read
 # as code.
 doc_markdown = "allow"
+
+# cast_possible_truncation, cast_sign_loss: `StepBudget::advance` converts a
+# floored, non-negative `f64` step count to `u32`, which is the one float to
+# integer cast in the crate. Section 6.4 gives the arithmetic in `f64`, and the
+# cast saturates, so the conversion cannot go wrong in the direction the two
+# lints name.
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"

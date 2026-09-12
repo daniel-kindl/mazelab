@@ -27,6 +27,19 @@ pub fn from_seed(seed: u64) -> Rng {
     <Rng as rand::SeedableRng>::seed_from_u64(seed)
 }
 
+/// Draws a seed from the operating system.
+///
+/// This is the one number in MazeLab that is not reproducible, and it is the
+/// number reproducibility starts from: the `--seed` default of section 9, and
+/// the `n` key of section 7.5, which takes a fresh seed and builds a maze from
+/// it. The value-stability promise of ADR 0005 covers the stream a seed makes,
+/// and not where the seed came from, so the three rules above leave this draw
+/// free: it fixes nothing that a later run has to reproduce.
+#[must_use]
+pub fn fresh_seed() -> u64 {
+    rand::random()
+}
+
 /// Makes a child RNG, seeded from one draw on `parent`.
 ///
 /// A generator owns its RNG, because [`Generator::step`] takes no RNG and the
