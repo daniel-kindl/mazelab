@@ -43,6 +43,17 @@ The `(2W+1) x (2H+1)` grid of wall and open positions that a maze derives for
 rendering. The display grid is a pure function of the maze.
 _Avoid_: Render grid, screen grid
 
+**Chrome**:
+Everything the screen draws that is not the maze pane. Chrome is what the maze
+competes with for space.
+_Avoid_: Furniture, HUD, decoration
+
+**Capacity**:
+The largest maze that a terminal of a given size can show, derived from that
+size and from the chrome. Capacity is a property of the terminal, not of the
+maze: a maze can be larger than capacity, and then it is not shown.
+_Avoid_: Fit, max size
+
 ### Running an algorithm
 
 **Generator**:
@@ -62,8 +73,9 @@ One execution of a generator or a solver over a maze, together with its
 statistics. A maze outlives the runs that are made on it.
 
 **Seed**:
-The number that fixes every random draw a generator and the braiding pass make,
-and with it the maze they produce.
+The number that fixes every random draw a generator and the braiding pass make.
+A seed alone does not fix a maze: the same seed at a different size gives a
+different maze, so a maze is fixed by its seed, its size and the version.
 _Avoid_: Key, salt
 
 **Previous run**:

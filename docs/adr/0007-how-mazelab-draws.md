@@ -1,6 +1,6 @@
 # How MazeLab draws: two columns, 16 colours, and glyphs that carry the meaning
 
-Four choices that hold together. Any one of them read alone looks arbitrary.
+Choices that hold together. Any one of them read alone looks arbitrary.
 
 ## Two screen columns per display-grid position
 
@@ -89,6 +89,44 @@ The legend fits one row at every supported width. Labels shorten below 100
 columns, which is the breakpoint the help row already uses. `frontier` and
 `expanded` are glossary terms and are never shortened. The swatch for a state
 whose glyph is blank is bracketed, because a blank swatch demonstrates nothing.
+
+## What fits, and the two thresholds
+
+The footprint above fixes how much maze a terminal holds. The chrome is 0
+columns and 10 rows, so **capacity** is:
+
+    W = (cols - 2) / 4        H = (rows - 11) / 2
+
+A terminal can be too small in two unrelated ways, and they are kept apart
+because their causes and their remedies differ:
+
+1. **The maze does not fit.** The maze pane gives way to the too-small panel.
+   Status, statistics, legend and help keep rendering. This follows a shrink, or
+   a `--width` that asked for more than fits.
+2. **The chrome does not fit.** Below **79 x 19** the whole screen becomes the
+   panel.
+
+`79` is the legend row's short form. The legend never drops an entry, so it
+cannot be clipped, and at 79 columns it is the widest thing MazeLab draws: the
+help row's short form needs 67. The three-column statistics band is held under
+79 by shortening the algorithm name, `RecBack` and `RandPrim`, with the full
+name on the status row where there is width.
+
+The alternative was to let the band keep the long names and lift the floor to
+about 103 columns. That was rejected because it abandons the 80-column terminal
+that this layout was chosen for.
+
+`19` rows is the 10 rows of chrome plus the 9 that a 4-cell-tall maze needs.
+**4 x 4 is the smallest maze MazeLab makes**: at three rows a maze is a corridor
+and backtracking has nowhere to happen. There is no interactive maximum, because
+capacity already bounds anything a terminal can show. `--width` and `--height`
+are bounded at 512 only to refuse an absurd allocation, and they refuse it
+rather than clamping, because the size the user states is explicit.
+
+**Maze size is a model concern and the panel is a render concern.** A maze is
+generated at startup whatever the terminal size, so a later resize reveals a
+maze that already exists. This is the one-way rule of ADR 0006 applied to the
+question: the model never learns how big the terminal is.
 
 ## Before you bump crossterm
 
