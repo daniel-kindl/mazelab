@@ -104,6 +104,14 @@ expanded, open floor, wall. The generation order is current, frontier, carved,
 uncarved.
 _Avoid_: Cell colour. A cell state is independent of the palette that draws it.
 
+**Glyph set**:
+The complete mapping from cell state to the characters that draw it. MazeLab has
+two glyph sets: one that uses block glyphs, and one that uses ASCII characters
+only. A glyph set is selected as a whole, and the two are never mixed. Each cell
+state has a different glyph in each glyph set, so the glyph alone identifies the
+state, and colour only reinforces it.
+_Avoid_: Charset, glyph table, tileset
+
 ### Animating a run
 
 **Phase**:
