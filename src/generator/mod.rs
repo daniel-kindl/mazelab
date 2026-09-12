@@ -21,6 +21,13 @@
 //! 4. **`make` takes `&Maze`, so a factory cannot change the maze.** It reads
 //!    the width and the height to size its flag grids, and it fills the working
 //!    set. The first change a generator makes to a maze is in its first `step`.
+//!    Section 4 has both generators attach the cell they start from in `make`.
+//!    This signature does not allow that. **A generator that starts from an
+//!    unattached cell attaches it at the head of its first `step`**, before it
+//!    reads a neighbour. The attach is a `mark_carved` and not a carve, so rule
+//!    1 still holds and a run takes the number of steps section 4 states. The
+//!    maze then stays untouched through `Idle`, which is the phase the factory
+//!    is called in.
 //! 5. **Inspection is membership, not iteration.** The renderer resolves one
 //!    cell at a time, so [`Generator::is_frontier`] must answer in O(1).
 //!    Section 4 does that with a grid of `W * H` flags beside the working set.
@@ -30,6 +37,12 @@
 //!    reproduces a maze. Walk the neighbours of a cell in the fixed
 //!    `North, East, South, West` order of [`Dir::ALL`](crate::maze::Dir::ALL).
 //!    Read the three rules of [`crate::rng`] before you sample.
+//! 7. **A generator owns its RNG, and takes it with
+//!    [`rng::split`](crate::rng::split).** `step` takes no RNG and the factory
+//!    returns a box that borrows nothing, so a generator that draws has to hold
+//!    a stream. Split it off the RNG the factory is handed: a clone would draw
+//!    the numbers the braiding pass of [`crate::braid`] draws next, on the same
+//!    stream, after generation ends.
 //!
 //! # Adding a generator
 //!
@@ -126,6 +139,12 @@ use crate::rng::Rng;
 
 pub mod backtracker;
 pub mod prim;
+
+/// The cell both generators start from.
+///
+/// The choice is arbitrary and section 4 fixes it, so that a seed reproduces a
+/// maze. It is the cell rule 4 below has a generator attach on its first step.
+const START: Cell = Cell { x: 0, y: 0 };
 
 /// An algorithm that carves a maze, one step at a time.
 ///

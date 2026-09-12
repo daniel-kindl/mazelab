@@ -27,9 +27,29 @@ pub fn from_seed(seed: u64) -> Rng {
     <Rng as rand::SeedableRng>::seed_from_u64(seed)
 }
 
+/// Makes a child RNG, seeded from one draw on `parent`.
+///
+/// A generator owns its RNG, because [`Generator::step`] takes no RNG and the
+/// factory of section 3.4 returns a `Box<dyn Generator>` that borrows nothing.
+/// A clone of the parent would make the braiding pass, which runs after
+/// generation on the parent stream, draw the numbers generation already drew.
+/// One draw off the parent gives the generator a stream of its own and moves
+/// the parent past it, so the two never overlap and the seed still fixes both.
+///
+/// The draw is `next_u64`, and the child is seeded exactly as [`from_seed`]
+/// seeds the root. The child stream has a stored reference vector of its own
+/// in this module, so the split cannot change under the crate without a test
+/// failing.
+///
+/// [`Generator::step`]: crate::generator::Generator::step
+#[must_use]
+pub fn split(parent: &mut Rng) -> Rng {
+    from_seed(rand::Rng::next_u64(parent))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::from_seed;
+    use super::{from_seed, split};
     use rand::{Rng as _, RngExt as _};
 
     /// The reference vector of the RNG stream.
@@ -68,5 +88,48 @@ mod tests {
         let mut rng = from_seed(1);
         let drawn: Vec<u32> = (0..8).map(|_| rng.random_range(0u32..4u32)).collect();
         assert_eq!(drawn, [3, 0, 2, 1, 2, 0, 3, 2]);
+    }
+
+    /// The reference vector of the child stream that [`split`] makes.
+    ///
+    /// A generator runs on this stream, so a change to it changes every maze,
+    /// exactly as a change to the parent stream would. ADR 0005 asks for a
+    /// stored vector and not a comparison of two runs in one process, and the
+    /// split needs one for the same reason the two vectors above do.
+    #[test]
+    fn the_split_of_seed_1_gives_a_known_u32_stream() {
+        let mut parent = from_seed(1);
+        let mut child = split(&mut parent);
+        let drawn: Vec<u32> = (0..8).map(|_| child.next_u32()).collect();
+        assert_eq!(
+            drawn,
+            [
+                1_585_235_612,
+                4_266_108_181,
+                3_396_070_726,
+                3_765_714_712,
+                2_334_876_795,
+                3_857_237_732,
+                34_107_909,
+                2_060_094_958,
+            ]
+        );
+    }
+
+    /// The split takes exactly one `u64` off the parent. What the parent draws
+    /// after it is the second value of its stream, and not the first, which is
+    /// what keeps the braiding pass off the numbers a generator drew.
+    ///
+    /// This pins the shape of the split and not its values. The vector above
+    /// is what holds the values.
+    #[test]
+    fn split_takes_one_draw_from_the_parent_and_leaves_the_rest() {
+        let mut parent = from_seed(1);
+        let mut child = split(&mut parent);
+
+        let mut untouched = from_seed(1);
+        let consumed = untouched.next_u64();
+        assert_eq!(parent.next_u64(), untouched.next_u64());
+        assert_eq!(child.next_u64(), from_seed(consumed).next_u64());
     }
 }

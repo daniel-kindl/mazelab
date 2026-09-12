@@ -32,8 +32,22 @@ Three further rules are load-bearing. Each one looks like ceremony and is not.
   what makes a 32-bit and a 64-bit target draw the same values.
 - **No algorithm may iterate a `HashMap`.** Its order is not reproducible.
 
-Braiding draws from the same RNG stream as generation, so the seed still
-reproduces the whole maze.
+## Generation and braiding run on two streams that one seed fixes
+
+The first draft of this decision said that braiding draws from the same stream
+as generation. It cannot. A generator is a `Box<dyn Generator>` that borrows
+nothing and whose `step` takes no RNG, so a generator that draws has to own a
+stream.
+
+A generator takes that stream with `rng::split`, which seeds a child from a
+single `next_u64` draw on the RNG the factory is handed. Braiding then runs on
+the parent, past the draw the split consumed. **One seed fixes both streams,
+and neither draws a number the other drew.** That is what the promise at the
+top of this document needs, and it is the property the reader of a seed
+depends on.
+
+A clone in place of the split would keep the wording and lose the property: the
+braiding pass would draw the numbers generation had already drawn.
 
 ## Consequences
 
