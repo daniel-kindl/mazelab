@@ -53,6 +53,12 @@ advances and that the speed control budgets.
 One execution of a generator or a solver over a maze, together with its
 statistics. A maze outlives the runs that are made on it.
 
+**Previous run**:
+The run that was shown before the run now on screen, kept beside it so the two
+can be compared. A maze holds at most one previous run, and generating a new
+maze discards it.
+_Avoid_: Last run, baseline
+
 **Frontier**:
 The cells that an algorithm holds in its working set and has not yet processed.
 For a solver this is the queue, stack, or open set. For Recursive Backtracker it
@@ -84,3 +90,30 @@ which state shows. The solver order is start, goal, current, path, frontier,
 expanded, open floor, wall. The generation order is current, frontier, carved,
 uncarved.
 _Avoid_: Cell colour. A cell state is independent of the palette that draws it.
+
+### Animating a run
+
+**Phase**:
+The state that decides what the application does with a tick. The phases are
+Idle, Generating, Paused, Ready, Solving and Solved. A phase belongs to the
+application, not to an algorithm: an algorithm holds its own working set and
+knows nothing about pausing.
+_Avoid_: Mode, status
+
+**Tick**:
+One pass of the application loop. A tick applies the input that is waiting,
+advances the run by the step budget, and redraws if anything changed. A tick is
+not a fixed length of time.
+_Avoid_: Frame. A frame is one redraw, and a tick can pass without one.
+
+**Step budget**:
+The number of steps that a tick may run. The budget comes from the time that has
+passed and from the speed rung, so it follows the clock and not a count of
+ticks. A budget below one step accumulates until it reaches one.
+_Avoid_: Quota, allowance
+
+**Speed rung**:
+One entry on the speed ladder, which is the fixed, non-linear list of speeds
+that the user steps through. A rung is stated in steps per frame at the nominal
+redraw rate. Single step ignores the rung and always advances exactly one step.
+_Avoid_: Speed level, multiplier
