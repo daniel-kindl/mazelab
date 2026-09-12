@@ -22,3 +22,27 @@ pub mod rng;
 pub mod run;
 pub mod solver;
 pub mod ui;
+
+/// What one call to a `step` method did.
+///
+/// One enum, returned by both [`generator::Generator::step`] and
+/// [`solver::Solver::step`]. The two traits stay apart, because a generator
+/// takes the maze by `&mut` and a solver takes it by `&`. Only the outcome is
+/// shared, and that is what lets the loop advance either kind the same way.
+/// See ADR 0003, two traits not one.
+///
+/// `Done` is returned **on the step that completes the run**, not on a later
+/// call. The caller must not call `step` again after `Done`. This is the one
+/// place that rule is written down.
+///
+/// There is no `Exhausted` variant. Every maze is connected and braiding only
+/// adds edges, so a solver always reaches the goal. A variant that cannot occur
+/// still has to be matched at every call site forever.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum StepOutcome {
+    /// The algorithm advanced and the run goes on. This is what sets the dirty
+    /// flag of section 6, and it is the reason `step` returns a value at all.
+    Stepped,
+    /// The algorithm finished its work on this call.
+    Done,
+}
