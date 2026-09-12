@@ -152,13 +152,13 @@ impl Solver for Astar {
             // popped before it and took the cell out of the open set then.
             // Discarding an entry is a step too, which is rule 1.
             //
-            // This check stands **before** the two lines below it, and section
-            // 4.6 prints them above it. That order is the one deviation from
-            // the pseudocode, and it is a correction: the count would fall
-            // once for each duplicate the heap still holds, and section 4.6
-            // itself asks for `frontier_len() = in_open_count` beside
-            // `is_frontier(c) = in_open[c] && !expanded[c]`. Only the pop that
-            // expands a cell takes it out of the open set.
+            // This check stands before the two lines below it, and it must
+            // stay there. A stale pop that lowered the count would lower it
+            // once for every duplicate the heap still holds, and the count
+            // would go below zero. Only the pop that expands a cell takes that
+            // cell out of the open set, which is what section 4.6 asks for
+            // with `is_frontier(c) = in_open[c] && !expanded[c]` beside
+            // `frontier_len() = in_open_count`.
             return StepOutcome::Stepped;
         }
         let i = self.search.index(c);

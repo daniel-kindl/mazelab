@@ -614,9 +614,9 @@ make(maze, start, goal):
     push Node { f: h(start, goal), h: h(start, goal), insertion: 0, cell: start }
 
 step(maze):
-    node = open.pop(); in_open[node.cell] = false; in_open_count -= 1
-    c = node.cell
+    node = open.pop(); c = node.cell
     if expanded[c]: return Stepped          // lazy deletion of a stale entry
+    in_open[c] = false; in_open_count -= 1
     expanded[c] = true; expanded_count += 1
     current = Some(c)
     if c == goal:
@@ -634,6 +634,18 @@ step(maze):
 is_frontier(c) = in_open[c] && !expanded[c]
 frontier_len() = in_open_count
 ```
+
+**The open set is cleared on the pop that expands a cell, and not on a pop that
+discards one.** The heap holds one entry for each time a cell was reached by a
+shorter path, and `in_open` holds one flag for that cell. The pop that expands
+the cell clears the flag and lowers the count. A pop that discards a stale entry
+must leave both alone, or the count falls once for every duplicate the heap
+still holds and goes below zero. That order is what keeps `is_frontier` and
+`frontier_len` above true.
+
+> Corrected after handoff, in commit 77291e2. The handed-off text lowered the
+> count above the `expanded[c]` check, and a maze with loops then underflows it.
+> This is the one change made to this document after the freeze.
 
 Manhattan distance is admissible here: a step between two adjacent cells costs
 1, and a wall can only make the true path longer than the straight-line count.
