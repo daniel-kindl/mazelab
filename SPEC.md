@@ -770,6 +770,7 @@ pub struct App {
     pub ascii: bool,
     pub help_open: bool,
     pub too_small: Option<TooSmall>, // section 13
+    pub quit: bool,                 // the loop of 6.1 breaks on it
 }
 ```
 
@@ -787,6 +788,17 @@ cell-state functions of section 7.3 take the maze and nothing else.
 > beside `run`. Section 7.3 gives `solver_state` and `gen_state` no argument
 > that could carry an algorithm, so a `Run` has to own one, and the two fields
 > would have been a second owner of one box.
+
+> Corrected after handoff, in commit 2ace438. The handed-off struct did not
+> hold `quit`, and the loop of section 6.1 reads `app.quit`. The loop owns the
+> terminal, so quitting has to reach it as data.
+>
+> Two private fields stand beside the public ones, and neither breaks the rule
+> above. `capacity: Option<(u16, u16)>` is what the caller computes with the
+> capacity function of section 7.1 and passes in: `App` learns capacity, which
+> the size rules of section 13.2 need, and never the terminal size. `rng: Rng`
+> is the stream a generate started on, which the braiding pass of section 4.3
+> draws from when the generation run reports `Done`, one or more ticks later.
 
 ---
 
@@ -1164,7 +1176,7 @@ follow. `--ascii` is the guarantee, not the assumption.
 | `<-` `->` | maze narrower / wider | regenerates instantly |
 | `Up` `Down` | maze taller / shorter | regenerates instantly |
 | `f` | refit and regenerate | fits the maze to the terminal now |
-| `n` | new seed | a fresh random seed, then generate animated |
+| `n` | new seed | a fresh random seed, then regenerates instantly |
 | `b` | braid factor | cycles 0.00, 0.25, 0.50; regenerates instantly |
 | `?` | help | the full keymap over the maze pane |
 | `q` `Esc` | quit | restores the terminal |
@@ -1175,6 +1187,13 @@ state. `Tab` is the one cycling shortcut, for the case the application is built
 for, which is running the same maze through solver after solver.
 
 `+` is accepted with and without shift, so `=` is an alias. `-` needs no alias.
+
+> Corrected after handoff, in commit 2ace438. The handed-off table said that
+> `n` generates animated. Section 6.5 lists `n` among the keys that run
+> generation to completion outside the loop, and the `any` arm of the diagram
+> in section 5.1 sends every key but `g` to `Ready`. The two cannot both hold.
+> Section 6.5 is the one that gives the shape of the operation, so `n` is
+> instant and `g` is the one key that animates.
 
 **The help overlay.** `?` toggles a bordered overlay over the maze pane holding
 the whole table above. While it is open, `Esc` closes the overlay instead of
@@ -1286,6 +1305,13 @@ run on this maze, in the order they were run.
 It is cleared by any new maze. The comparison is between solvers on one maze.
 
 An abandoned solver run never promotes. Only a run that reached `Solved` does.
+
+> Corrected after handoff, in commit 2ace438. "so the column is never empty"
+> holds for the `Ready` that follows a generate, where the generation run is
+> still on screen. It does not hold for the `Ready` a solver key reaches from
+> `Solved` or from `Solving`: the run that column held is promoted, or
+> abandoned, and the next run starts on `s`. The band draws an empty this-run
+> column there.
 
 ```rust
 pub struct RunStats {
