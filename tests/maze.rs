@@ -5,6 +5,8 @@
 //! wall bytes by reading them would prove nothing.
 
 use mazelab::maze::{Cell, Dir, DisplayCell, Maze};
+use mazelab::rng;
+use rand::RngExt as _;
 
 /// Every interior edge of the maze, in row-major order, each named by the cell
 /// on its low side and the direction that crosses it.
@@ -21,6 +23,21 @@ fn interior_edges(maze: &Maze) -> Vec<(Cell, Dir)> {
         }
     }
     edges
+}
+
+/// The neighbour of `c` in direction `d`, where the test knows there is one.
+fn neighbour_of(maze: &Maze, c: Cell, d: Dir) -> Cell {
+    maze.neighbour(c, d)
+        .unwrap_or_else(|| panic!("{c:?} has no neighbour towards {d:?}"))
+}
+
+/// Carves every interior edge, which leaves a maze in which every wall that
+/// can hold an edge holds one.
+fn carve_every_edge(maze: &mut Maze) {
+    for (c, d) in interior_edges(maze) {
+        let n = neighbour_of(maze, c, d);
+        maze.carve(c, n);
+    }
 }
 
 /// Asserts that the two copies of every wall agree, and that no border wall is
@@ -57,13 +74,11 @@ fn wall_flags_agree_on_both_sides_after_every_edge_is_carved() {
     assert_walls_agree(&maze);
 
     for (c, d) in interior_edges(&maze) {
-        let n = maze
-            .neighbour(c, d)
-            .unwrap_or_else(|| panic!("{c:?} has no neighbour towards {d:?}"));
+        let n = neighbour_of(&maze, c, d);
         maze.carve(c, n);
         assert!(
             maze.is_open(c, d),
-            "the carve at {c:?} towards {d:?} did not open the wall"
+            "the carve at {c:?} towards {d:?} did not carve the wall"
         );
         assert_walls_agree(&maze);
     }
@@ -142,9 +157,7 @@ fn edge_count_counts_one_wall_once() {
     let mut maze = Maze::new(5, 5);
     let centre = Cell { x: 2, y: 2 };
     for d in Dir::ALL {
-        let n = maze
-            .neighbour(centre, d)
-            .unwrap_or_else(|| panic!("{centre:?} has no neighbour towards {d:?}"));
+        let n = neighbour_of(&maze, centre, d);
         maze.carve(centre, n);
     }
 
@@ -160,10 +173,7 @@ fn degree_counts_the_carved_edges_and_a_dead_end_has_one() {
     let centre = Cell { x: 2, y: 2 };
     let arms: Vec<Cell> = Dir::ALL
         .into_iter()
-        .map(|d| {
-            maze.neighbour(centre, d)
-                .unwrap_or_else(|| panic!("{centre:?} has no neighbour towards {d:?}"))
-        })
+        .map(|d| neighbour_of(&maze, centre, d))
         .collect();
     for &arm in &arms {
         maze.carve(centre, arm);
@@ -193,8 +203,8 @@ fn carve_panics_on_a_cell_outside_the_maze() {
     maze.carve(Cell { x: 3, y: 0 }, Cell { x: 4, y: 0 });
 }
 
-/// The one-letter name of a display position, for the hand-worked grid below.
-fn glyph(d: DisplayCell) -> char {
+/// The one-letter mark of a display position, for the hand-worked grid below.
+fn mark(d: DisplayCell) -> char {
     match d {
         DisplayCell::Cell(_) => 'c',
         DisplayCell::Passage(_, _) => 'p',
@@ -207,7 +217,7 @@ fn display_rows(maze: &Maze) -> Vec<String> {
     (0..maze.display_height())
         .map(|dy| {
             (0..maze.display_width())
-                .map(|dx| glyph(maze.display_cell(dx, dy)))
+                .map(|dx| mark(maze.display_cell(dx, dy)))
                 .collect()
         })
         .collect()
@@ -310,12 +320,7 @@ fn every_display_position_classifies_as_the_table_says() {
 #[test]
 fn the_outer_border_is_always_wall() {
     let mut maze = Maze::new(5, 4);
-    for (c, d) in interior_edges(&maze) {
-        let n = maze
-            .neighbour(c, d)
-            .unwrap_or_else(|| panic!("{c:?} has no neighbour towards {d:?}"));
-        maze.carve(c, n);
-    }
+    carve_every_edge(&mut maze);
 
     let (w, h) = (maze.display_width(), maze.display_height());
     for dx in 0..w {
@@ -345,27 +350,64 @@ fn the_outer_border_is_always_wall() {
 }
 
 /// The materialised grid is the same derivation in one value, for the tier-3
-/// snapshot tests. It is row-major, and it agrees with `display_cell` at every
-/// position. Nothing at run time calls it: section 2.3 gives the reason.
+/// snapshot tests. Its shape is what this pins: the length, the row-major
+/// order and the payloads, against a grid written out by hand. Nothing at run
+/// time calls it, and section 2.3 gives the reason.
 #[test]
-fn the_materialised_display_grid_agrees_with_the_index_function() {
-    let mut maze = Maze::new(4, 3);
-    maze.carve(Cell { x: 0, y: 0 }, Cell { x: 0, y: 1 });
-    maze.carve(Cell { x: 0, y: 1 }, Cell { x: 1, y: 1 });
-    maze.carve(Cell { x: 3, y: 2 }, Cell { x: 3, y: 1 });
+fn the_materialised_display_grid_is_row_major_and_holds_the_same_derivation() {
+    let mut maze = Maze::new(2, 2);
+    maze.carve(Cell { x: 0, y: 0 }, Cell { x: 1, y: 0 });
+    maze.carve(Cell { x: 1, y: 0 }, Cell { x: 1, y: 1 });
 
     let grid = maze.display_grid();
-    let (w, h) = (maze.display_width(), maze.display_height());
-    assert_eq!(grid.len(), usize::from(w) * usize::from(h));
+    assert_eq!(grid.len(), 25);
 
-    for dy in 0..h {
-        for dx in 0..w {
-            let i = usize::from(dy) * usize::from(w) + usize::from(dx);
-            assert_eq!(
-                grid[i],
-                maze.display_cell(dx, dy),
-                "the position ({dx}, {dy})"
-            );
-        }
+    let rows: Vec<String> = grid
+        .chunks(5)
+        .map(|row| row.iter().copied().map(mark).collect())
+        .collect();
+    assert_eq!(
+        rows,
+        vec![
+            "#####".to_string(),
+            "#cpc#".to_string(),
+            "###p#".to_string(),
+            "#c#c#".to_string(),
+            "#####".to_string(),
+        ]
+    );
+
+    // The payloads of the second row, which the marks alone do not show.
+    assert_eq!(grid[6], DisplayCell::Cell(Cell { x: 0, y: 0 }));
+    assert_eq!(
+        grid[7],
+        DisplayCell::Passage(Cell { x: 0, y: 0 }, Cell { x: 1, y: 0 })
+    );
+    assert_eq!(grid[8], DisplayCell::Cell(Cell { x: 1, y: 0 }));
+}
+
+/// Item 6 of section 11.1, as a sequence the test did not choose: 400 carves
+/// drawn from the crate RNG at a fixed seed, which interleaves the four
+/// directions and repeats edges. The invariant holds after each one.
+#[test]
+fn wall_flags_agree_on_both_sides_after_a_random_sequence_of_carves() {
+    let mut maze = Maze::new(7, 5);
+    let edges = interior_edges(&maze);
+    let count = u32::try_from(edges.len()).unwrap_or(u32::MAX);
+    let mut rng = rng::from_seed(20_260_912);
+
+    for _ in 0..400 {
+        let (c, d) = edges[rng.random_range(0u32..count) as usize];
+        maze.carve(c, neighbour_of(&maze, c, d));
+        assert_walls_agree(&maze);
     }
+}
+
+/// Marking a cell that is outside the maze is a caller's fault, like carving
+/// one.
+#[test]
+#[should_panic(expected = "inside the maze")]
+fn mark_carved_panics_on_a_cell_outside_the_maze() {
+    let mut maze = Maze::new(4, 4);
+    maze.mark_carved(Cell { x: 4, y: 0 });
 }

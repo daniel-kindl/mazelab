@@ -89,9 +89,17 @@ impl Maze {
     /// Makes a maze in which every wall stands and no cell is carved.
     ///
     /// Section 13 bounds `width` and `height` to `4..=512`, and the command
-    /// line of section 9 is where that bound is applied.
+    /// line of section 9 is where that bound is applied. The floor of 4 is a
+    /// bound on what is worth showing, and the maze holds a smaller grid
+    /// correctly. The cap of 512 is a bound on the model: above 32767 the
+    /// display-grid width of section 2.3 does not fit a `u16`, so a debug
+    /// build asserts the cap here.
     #[must_use]
     pub fn new(width: u16, height: u16) -> Self {
+        debug_assert!(
+            width <= 512 && height <= 512,
+            "section 13 caps a maze at 512 on each axis, and got {width} x {height}"
+        );
         let cells = usize::from(width) * usize::from(height);
         Self {
             width,
@@ -278,10 +286,10 @@ impl Maze {
     /// The whole display grid as one value, in row-major order.
     ///
     /// This is for the tier-3 snapshot tests of section 11.3, which need a
-    /// whole value to compare. Nothing at run time calls it: a materialised
+    /// whole value to compare. Nothing at run time calls it. A materialised
     /// grid must be rebuilt every frame, or cached and invalidated on every
-    /// carve, and [`Maze::display_cell`] allocates nothing and cannot go
-    /// stale in the middle of a generation.
+    /// carve. [`Maze::display_cell`] allocates nothing, and it cannot go stale
+    /// in the middle of a generation.
     #[must_use]
     pub fn display_grid(&self) -> Vec<DisplayCell> {
         let (w, h) = (self.display_width(), self.display_height());
