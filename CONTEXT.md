@@ -25,10 +25,18 @@ _Avoid_: Dig, open, break
 A maze whose carved edges form a spanning tree. Exactly one simple path connects
 any two cells.
 
+**Dead end**:
+A cell with exactly one carved edge, so an algorithm that enters it must leave
+the way it came.
+
+**Braiding**:
+The pass that runs after generation and removes a fraction of dead ends, by
+carving one more edge out of each dead end it takes.
+
 **Braid factor**:
-The fraction of dead ends that a post-generation pass removes. A braid factor of
-0 keeps the maze perfect. A braid factor above 0 adds loops, so more than one
-path can connect two cells.
+The fraction of dead ends that braiding removes. A braid factor of 0 keeps the
+maze perfect. A braid factor above 0 adds loops, so more than one path can
+connect two cells.
 
 **Display grid**:
 The `(2W+1) x (2H+1)` grid of wall and open positions that a maze derives for
@@ -52,6 +60,11 @@ advances and that the speed control budgets.
 **Run**:
 One execution of a generator or a solver over a maze, together with its
 statistics. A maze outlives the runs that are made on it.
+
+**Seed**:
+The number that fixes every random draw a generator and the braiding pass make,
+and with it the maze they produce.
+_Avoid_: Key, salt
 
 **Previous run**:
 The run that was shown before the run now on screen, kept beside it so the two
@@ -112,8 +125,11 @@ passed and from the speed rung, so it follows the clock and not a count of
 ticks. A budget below one step accumulates until it reaches one.
 _Avoid_: Quota, allowance
 
+**Speed ladder**:
+The fixed, non-linear list of speeds that the user steps through. It spans both
+generation and solving as one list.
+
 **Speed rung**:
-One entry on the speed ladder, which is the fixed, non-linear list of speeds
-that the user steps through. A rung is stated in steps per frame at the nominal
-redraw rate. Single step ignores the rung and always advances exactly one step.
+One entry on the speed ladder, stated in steps per frame at the nominal redraw
+rate. Single step ignores the rung and always advances exactly one step.
 _Avoid_: Speed level, multiplier
