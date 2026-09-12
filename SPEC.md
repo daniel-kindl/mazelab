@@ -22,7 +22,9 @@ is stated here.
 
 Status: frozen at handoff. When the code and this document disagree, the code
 wins and this document is not updated. It is the record of what was decided
-before the first line was written.
+before the first line was written. One exception holds: an error that would
+send an implementer the wrong way is corrected in place, and the correction
+carries a note that says what changed and in which commit.
 
 ## Contents
 
