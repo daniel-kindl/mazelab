@@ -1,0 +1,10 @@
+# THROWAWAY PROTOTYPE. Not the start of the application.
+# Answers issue #6: what does the MazeLab screen look like, and what are the keys?
+[package]
+name = "mazelab-screen-proto"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+ratatui = "0.30.2"
