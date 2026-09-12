@@ -47,7 +47,7 @@
 //! doctest shows, with `&Maze` in place of `&mut Maze`.
 
 use crate::StepOutcome;
-use crate::maze::{Cell, Maze};
+use crate::maze::{Cell, Dir, Maze};
 
 pub mod astar;
 pub mod bfs;
@@ -81,6 +81,157 @@ pub trait Solver {
     /// The path from start to goal, inclusive. `Some` once [`Solver::step`]
     /// returned [`StepOutcome::Done`], `None` before that.
     fn path(&self) -> Option<&[Cell]>;
+}
+
+/// The neighbours of `c` a solver can move to: the cells on the far side of a
+/// carved edge, in the fixed `North, East, South, West` order of [`Dir::ALL`].
+///
+/// Rule 6 of the contract asks for that order. A solver draws no random
+/// number, so the order of this walk is the whole order of a run.
+fn reachable(maze: &Maze, c: Cell) -> impl Iterator<Item = Cell> {
+    Dir::ALL
+        .into_iter()
+        .filter(move |&d| maze.is_open(c, d))
+        .filter_map(move |d| maze.neighbour(c, d))
+}
+
+/// The search state the three solvers of section 4 share: the cells they have
+/// expanded, the parent each cell was reached from, and the path that the
+/// parents reconstruct.
+///
+/// The working set is what the three do not share, and it stays in their own
+/// files: a stack, a queue and a heap. Everything else here is the same in all
+/// three, down to the four inspection methods that delegate to it.
+struct Search {
+    /// The width of the maze, for the offset into the flag grids.
+    width: u16,
+    /// The height of the maze, for the bound on a cell from outside.
+    height: u16,
+    /// The cell the search starts from, where the path begins.
+    start: Cell,
+    /// The cell the search looks for, where the path ends.
+    goal: Cell,
+    /// One flag for each cell: the solver took the cell out of its frontier
+    /// and processed it. Rule 5 asks for an O(1) `is_expanded`.
+    expanded: Vec<bool>,
+    /// The number of set flags in `expanded`, which is what the statistics
+    /// band draws.
+    expanded_count: usize,
+    /// The cell each cell was reached from. `None` for the start, and for a
+    /// cell no step has reached.
+    parent: Vec<Option<Cell>>,
+    /// The single cell the step now shown is acting on.
+    current: Option<Cell>,
+    /// The path, from the step that reached the goal onward.
+    path: Option<Vec<Cell>>,
+}
+
+impl Search {
+    /// Makes the search state for a run over `maze`, from `start` to `goal`.
+    fn new(maze: &Maze, start: Cell, goal: Cell) -> Self {
+        let cells = usize::from(maze.width()) * usize::from(maze.height());
+        Self {
+            width: maze.width(),
+            height: maze.height(),
+            start,
+            goal,
+            expanded: vec![false; cells],
+            expanded_count: 0,
+            parent: vec![None; cells],
+            current: None,
+            path: None,
+        }
+    }
+
+    /// The number of cells in the maze, which is the size of a flag grid.
+    fn cell_count(&self) -> usize {
+        self.expanded.len()
+    }
+
+    /// The offset of a cell the caller knows is inside the maze.
+    fn index(&self, c: Cell) -> usize {
+        usize::from(c.y) * usize::from(self.width) + usize::from(c.x)
+    }
+
+    /// The offset of a cell, or `None` when the cell is outside the maze.
+    ///
+    /// The column has to be checked as well as the row: an offset past the end
+    /// of a row lands on the next one. This is what every method that answers
+    /// a question about an arbitrary cell goes through.
+    fn offset(&self, c: Cell) -> Option<usize> {
+        (c.x < self.width && c.y < self.height).then(|| self.index(c))
+    }
+
+    /// The cell the search looks for.
+    const fn goal(&self) -> Cell {
+        self.goal
+    }
+
+    /// True when the solver has expanded this cell.
+    fn is_expanded(&self, c: Cell) -> bool {
+        self.offset(c).is_some_and(|i| self.expanded[i])
+    }
+
+    /// The number of cells the solver has expanded.
+    const fn expanded_count(&self) -> usize {
+        self.expanded_count
+    }
+
+    /// Records that this step expanded `c`, and makes it the current cell.
+    ///
+    /// A cell is expanded once, which is rule 4 of the contract. The caller
+    /// discards a stale duplicate before it gets here.
+    fn expand(&mut self, c: Cell) {
+        let i = self.index(c);
+        self.expanded[i] = true;
+        self.expanded_count += 1;
+        self.current = Some(c);
+    }
+
+    /// Records the cell `c` was reached from.
+    fn set_parent(&mut self, c: Cell, parent: Cell) {
+        let i = self.index(c);
+        self.parent[i] = Some(parent);
+    }
+
+    /// The single cell the step now shown is acting on.
+    const fn current(&self) -> Option<Cell> {
+        self.current
+    }
+
+    /// The path, `None` until the step that reached the goal.
+    fn path(&self) -> Option<&[Cell]> {
+        self.path.as_deref()
+    }
+
+    /// Records the path and answers [`StepOutcome::Done`]. This is the tail of
+    /// the step that reached the goal, in all three solvers.
+    fn finish(&mut self) -> StepOutcome {
+        self.path = Some(self.reconstruct());
+        StepOutcome::Done
+    }
+
+    /// The path from start to goal, inclusive, which is section 4.7.
+    ///
+    /// The walk runs back from the goal along `parent` and the result is
+    /// reversed. It ends at the start, because the start is the one cell a
+    /// solver reaches without a parent and every other cell on the chain was
+    /// reached from one. **Path length** counts both ends, so both are here.
+    fn reconstruct(&self) -> Vec<Cell> {
+        let mut path = Vec::new();
+        let mut next = Some(self.goal);
+        while let Some(c) = next {
+            path.push(c);
+            next = self.parent[self.index(c)];
+        }
+        path.reverse();
+        debug_assert_eq!(
+            path.first(),
+            Some(&self.start),
+            "the parent chain from the goal does not reach the start"
+        );
+        path
+    }
 }
 
 /// One row of the solver registry.
