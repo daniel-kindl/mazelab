@@ -19,9 +19,8 @@ use crate::app::{Activity, App, Phase};
 /// every band that draws a glyph reads it from this one value, so no frame can
 /// mix the two glyph sets.
 ///
-/// The legend row, the help row and the two too-small panels of section 13
-/// are not drawn yet. Their bands stay blank, and a maze that does not fit the
-/// pane is not drawn.
+/// The two too-small panels of section 13 are not drawn yet. A maze that does
+/// not fit the pane is not drawn.
 pub fn render(frame: &mut Frame, app: &App) {
     let glyphs = if app.ascii {
         &palette::ASCII
@@ -33,6 +32,8 @@ pub fn render(frame: &mut Frame, app: &App) {
     frame.render_widget(layout::status_line(app), bands.status);
     maze::render(app, glyphs, bands.maze, frame.buffer_mut());
     stats::render(app, bands.stats, frame.buffer_mut());
+    legend::render(app, glyphs, bands.legend, frame.buffer_mut());
+    frame.render_widget(help::row(bands.help.width), bands.help);
     if app.help_open {
         help::render_overlay(screen, bands.maze, frame.buffer_mut());
     }

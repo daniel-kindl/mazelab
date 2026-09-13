@@ -186,8 +186,11 @@ pub const MIN_SIZE: u16 = 4;
 /// section 9 rejects a larger value at parse time instead of clamping it.
 pub const MAX_SIZE: u16 = 512;
 
-/// The columns of the layout floor, set by the short form of the legend, which
-/// is the widest thing MazeLab draws.
+/// The columns of the layout floor. Section 13.1.
+///
+/// Every row and box of the chrome fits in it: the short legend is 74 columns,
+/// the short help row 67, and the help overlay 76. `tests/legend.rs` and
+/// `tests/help.rs` hold the two rows to it.
 pub const FLOOR_COLS: u16 = 79;
 
 /// The rows of the layout floor: [`CHROME_ROWS`] plus the 9 rows a 4-cell-tall

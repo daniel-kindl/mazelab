@@ -1,13 +1,69 @@
 //! The help row and the help overlay: they name the keys.
 //!
-//! The help row names the keys in the form that fits the breakpoint. The help
-//! overlay holds the whole keymap of section 7.5, and `?` opens it over the
-//! maze pane.
+//! The help row names the keys in the form that fits the breakpoint, and
+//! **it never clips**. The help overlay holds the whole keymap of section 7.5,
+//! and `?` opens it over the maze pane.
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::text::Line;
+use ratatui::style::{Color, Style};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Padding, Paragraph, Widget};
+
+use crate::ui::layout::BREAKPOINT;
+
+/// The short form of the help row, below [`BREAKPOINT`] columns: 67 columns.
+///
+/// It holds the keys that start, pause, step and speed a run. It also holds
+/// `?`, which opens the whole keymap, and `q`, which quits.
+const SHORT: [(&str, &str); 7] = [
+    ("g", "generate"),
+    ("s", "solve"),
+    ("Space", "pause"),
+    (".", "step"),
+    ("+/-", "speed"),
+    ("?", "help"),
+    ("q", "quit"),
+];
+
+/// The full form of the help row, at [`BREAKPOINT`] columns and above: 99
+/// columns.
+///
+/// It is the short form with `G`, the generator keys and the solver keys
+/// added, so no entry of the short form goes away on a wider terminal. `Tab`, the arrow keys,
+/// `f`, `n` and `b` do not fit, and the help overlay names them.
+const FULL: [(&str, &str); 10] = [
+    ("g", "generate"),
+    ("G", "instant"),
+    ("s", "solve"),
+    ("Space", "pause"),
+    (".", "step"),
+    ("+/-", "speed"),
+    ("1-2", "gen"),
+    ("3-5", "solver"),
+    ("?", "help"),
+    ("q", "quit"),
+];
+
+/// The help row, in the form that fits `width` columns.
+///
+/// Each entry is the key, then a space and the label, and two spaces separate
+/// the entries. The key is `Yellow`. Section 7.4 banishes `Yellow` from the
+/// maze palette only, and keeps it for the key hints, where a contrast failure
+/// costs nothing.
+#[must_use]
+pub fn row(width: u16) -> Line<'static> {
+    let entries: &[(&str, &str)] = if width >= BREAKPOINT { &FULL } else { &SHORT };
+    let mut spans = Vec::new();
+    for &(keys, label) in entries {
+        if !spans.is_empty() {
+            spans.push(Span::raw("  "));
+        }
+        spans.push(Span::styled(keys, Style::new().fg(Color::Yellow)));
+        spans.push(Span::raw(format!(" {label}")));
+    }
+    Line::from(spans)
+}
 
 /// One row of the keymap: the keys, what they do, and a note.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

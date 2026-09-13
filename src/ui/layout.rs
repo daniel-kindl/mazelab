@@ -15,6 +15,11 @@ use crate::solver::SOLVERS;
 /// border. Section 8.1.
 pub const STATS_ROWS: u16 = 7;
 
+/// The width at which the legend row and the help row change form. At this
+/// many columns and above, each draws its full form. Below it, each draws its
+/// short form. Sections 7.6 and 7.7.
+pub const BREAKPOINT: u16 = 100;
+
 /// The five bands of section 7.1, top to bottom.
 ///
 /// **Chrome** is every band but the maze pane, and it costs 0 columns and

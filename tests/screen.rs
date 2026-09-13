@@ -166,9 +166,13 @@ fn the_chrome_costs_no_columns_and_ten_rows() {
 // The maze pane
 // ---------------------------------------------------------------------------
 
-/// The number of times `glyph` is drawn on the screen.
+/// The number of times `glyph` is drawn above the statistics band: on the
+/// status row and in the maze pane.
+///
+/// The legend row draws one swatch of every cell state, so a count over the
+/// whole screen would count the legend too.
 fn count(buffer: &Buffer, glyph: &str) -> usize {
-    (0..buffer.area.height)
+    (0..buffer.area.height - layout::STATS_ROWS - 2)
         .map(|y| row(buffer, y).matches(glyph).count())
         .sum()
 }
@@ -542,7 +546,8 @@ fn maze_row(glyphs: &str) -> Line<'static> {
 /// expanded (1,3) and path (2,3). The goal is also the current cell, and goal
 /// ranks above current.
 ///
-/// The legend row and the help row are the last two rows.
+/// The legend row and the help row are the last two rows, in their short
+/// forms, because 79 columns is below the breakpoint.
 #[test]
 fn a_small_solved_maze_fills_the_screen_at_the_layout_floor() {
     let startup = Startup {
@@ -591,7 +596,49 @@ fn a_small_solved_maze_fills_the_screen_at_the_layout_floor() {
         Line::from(
             "└────────────────────────┘└─────────────────────────┘└────────────────────────┘",
         ),
-        Line::from(""),
-        Line::from(""),
+        legend_row(),
+        help_row(),
     ]);
+}
+
+/// The short solver legend of section 7.6, in the colours of section 7.4.
+fn legend_row() -> Line<'static> {
+    let bold = |colour| Style::new().fg(colour).add_modifier(Modifier::BOLD);
+    Line::from(vec![
+        Span::styled("SS", bold(Color::LightGreen)),
+        Span::raw(" start "),
+        Span::styled("GG", bold(Color::LightRed)),
+        Span::raw(" goal "),
+        Span::styled("@@", bold(Color::White)),
+        Span::raw(" cur "),
+        Span::styled("▓▓", Style::new().fg(Color::Green)),
+        Span::raw(" path "),
+        Span::styled("▒▒", Style::new().fg(Color::LightCyan)),
+        Span::raw(" frontier "),
+        Span::styled("░░", Style::new().fg(Color::Blue)),
+        Span::raw(" expanded [  ] floor "),
+        Span::styled("██", Style::new().fg(Color::DarkGray)),
+        Span::raw(" wall"),
+    ])
+}
+
+/// The short help row of section 7.7, with the keys in `Yellow`.
+fn help_row() -> Line<'static> {
+    let key = |text| Span::styled(text, Style::new().fg(Color::Yellow));
+    Line::from(vec![
+        key("g"),
+        Span::raw(" generate  "),
+        key("s"),
+        Span::raw(" solve  "),
+        key("Space"),
+        Span::raw(" pause  "),
+        key("."),
+        Span::raw(" step  "),
+        key("+/-"),
+        Span::raw(" speed  "),
+        key("?"),
+        Span::raw(" help  "),
+        key("q"),
+        Span::raw(" quit"),
+    ])
 }
