@@ -1780,6 +1780,11 @@ The keymap is written down **once**: the README shows the help row's 12 keys and
 defers to `?`. A full 16-row table in markdown would be a third copy that
 nothing keeps in sync.
 
+> Corrected after handoff, in commit 94478f7. The handed-off text said "the
+> help row's 12 keys". Section 7.7 was corrected in commit 2378ded, and the
+> full form of the help row now holds 10 keys. The README shows those 10 keys,
+> as `src/ui/help.rs` draws them, and defers to `?` for the rest.
+
 The README also explains the **equal path lengths** in two sentences, because
 the demo shows every solver returning the same length and the honest reading of
 that is a broken comparison. The same sentences teach the reader to watch
