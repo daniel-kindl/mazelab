@@ -1,10 +1,21 @@
 # MazeLab
 
-MazeLab is a terminal application that animates maze generation and
-pathfinding. It shows an algorithm one step at a time. You see the cell it acts
-on, its **frontier**, and the cells that a solver **expanded**.
+MazeLab is a terminal application for exploring maze-generation and
+pathfinding algorithms. It runs them one step at a time and shows the current
+cell, the **frontier** and the cells that a solver **expanded**.
 
 ![MazeLab generates a maze with the Recursive Backtracker, solves it with BFS, then solves it again with A*](docs/media/demo.gif)
+
+## Features
+
+- Recursive Backtracker and Randomized Prim maze generation
+- DFS, BFS and A\* pathfinding
+- Pause, single step and 9 animation speeds, from 0.5x to 1024x
+- Two solver runs side by side on one maze, for comparison
+- Braiding, which adds loops so that more than one path can join two cells
+- Seeded mazes that you can reproduce
+- A maze that fills the terminal at startup, and `f` to refit it after a resize
+- An ASCII glyph set, `--ascii`, for terminals that cannot draw block glyphs
 
 ## Run it
 
@@ -21,41 +32,40 @@ cargo run --release --locked -- --seed 7 --width 24 --height 8 --solver bfs
 ```
 
 `cargo run --release -- --help` lists the flags. Without `--seed`, MazeLab
-draws a fresh seed. Without `--width` or `--height`, MazeLab uses the largest
-size that the terminal can show on that axis. Below 79 x 19 it uses 4.
+draws a fresh seed.
 
-MazeLab has two generators, Recursive Backtracker and Randomized Prim, and three
-solvers, DFS, BFS and A\*.
+Without `--width`, the maze is as wide as the terminal can show. Without
+`--height`, it is as tall as the terminal can show. If the terminal is smaller
+than 79 columns by 19 rows, a width or height that you do not give is 4 cells.
 
-## Keys
+## Controls
 
-The help row at the bottom of the screen names the main keys:
+These are the keys in the help row at the bottom of the screen:
 
-```text
-g generate  G instant  s solve  Space pause  . step  +/- speed  1-2 gen  3-5 solver  ? help  q quit
-```
+| Key | Action |
+| --- | --- |
+| `g` | Generate, animated |
+| `G` | Generate instantly |
+| `s` | Solve with the selected solver |
+| `Space` | Pause or resume |
+| `.` | Single step |
+| `+` / `-` | Speed up or slow down |
+| `1` `2` | Choose the generator |
+| `3` `4` `5` | Choose the solver |
+| `?` | Show the full keymap |
+| `q` | Quit |
 
-Press `?` for the full keymap. It also holds `Tab`, the arrow keys, `f`, `n`
-and `b`.
+The full keymap also holds `Tab`, the arrow keys, `f`, `n` and `b`.
 
-## Why the solvers in the demo find paths of the same length
+## Comparing solvers
+
+Choose a solver and press `s`. Then choose another solver and press `s` again.
+The statistics band shows the new run beside the previous run.
 
 At braid factor 0 the maze is **perfect**, so one path joins start and goal,
 and every solver returns it: equal lengths are expected, not a broken
 comparison. Watch **expanded** instead, the cells a solver searched: in the
 demo, BFS expands 176 and A\* 122.
-
-## Promises
-
-MazeLab makes two promises, and no others:
-
-- **Determinism.** The same seed, the same size and the same version of MazeLab
-  give the same maze on Linux, Windows and macOS. This is not a promise across
-  versions ([ADR 0005](docs/adr/0005-determinism-is-scoped-to-one-version.md)).
-  The braid factor has no flag, so the command line reproduces a maze only at
-  braid factor 0.
-- **The MSRV.** MazeLab builds with Rust 1.88.0. A CI job builds it with that
-  toolchain on every push to `main` and on every pull request into `main`.
 
 ## Cross-platform is a report, not a promise
 
@@ -69,6 +79,19 @@ when colour is absent: the glyph alone identifies each cell state.
 If block glyphs do not draw correctly in your terminal, run MazeLab with
 `--ascii`. The legend row shows every glyph and colour of the current phase, so
 you can check on screen.
+
+## Promises
+
+MazeLab makes two promises, and no others:
+
+- **Determinism.** The same seed, the same size and the same version of MazeLab
+  give the same maze on Linux, Windows and macOS. This is not a promise across
+  versions ([ADR 0005](docs/adr/0005-determinism-is-scoped-to-one-version.md)).
+  The braid factor has no flag, so the command line reproduces a maze only at
+  braid factor 0.
+- **Minimum Rust version (MSRV).** MazeLab builds with Rust 1.88.0. A CI job
+  builds it with that toolchain on every push to `main` and on every pull
+  request into `main`.
 
 ## Add an algorithm
 
