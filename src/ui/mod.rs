@@ -10,7 +10,7 @@ pub mod stats;
 
 use ratatui::Frame;
 
-use crate::app::{Activity, App, Phase};
+use crate::app::{Activity, App, Phase, TooSmall};
 
 /// Draws one frame of the screen of section 7.
 ///
@@ -19,18 +19,30 @@ use crate::app::{Activity, App, Phase};
 /// every band that draws a glyph reads it from this one value, so no frame can
 /// mix the two glyph sets.
 ///
-/// The two too-small panels of section 13 are not drawn yet. A maze that does
-/// not fit the pane is not drawn.
+/// **The two too-small panels of section 13 replace different things.** A
+/// maze that does not fit the terminal gives the maze-fit panel in place of
+/// the maze pane, and every other band keeps rendering. Below the layout floor
+/// the whole screen is the layout-floor panel, and nothing else is drawn: not
+/// the legend, and not the help overlay. `App` decides which threshold fired,
+/// and `render` reads the answer from [`App::too_small`].
 pub fn render(frame: &mut Frame, app: &App) {
+    let screen = frame.area();
+    if app.too_small == Some(TooSmall::LayoutFloor) {
+        frame.render_widget(&panel::layout_floor(screen), screen);
+        return;
+    }
     let glyphs = if app.ascii {
         &palette::ASCII
     } else {
         &palette::UNICODE
     };
-    let screen = frame.area();
     let bands = layout::bands(screen);
     frame.render_widget(layout::status_line(app), bands.status);
-    maze::render(app, glyphs, bands.maze, frame.buffer_mut());
+    if app.too_small == Some(TooSmall::MazeFit) {
+        frame.render_widget(&panel::maze_fit(&app.maze, screen), bands.maze);
+    } else {
+        maze::render(app, glyphs, bands.maze, frame.buffer_mut());
+    }
     stats::render(app, bands.stats, frame.buffer_mut());
     legend::render(app, glyphs, bands.legend, frame.buffer_mut());
     frame.render_widget(help::row(bands.help.width), bands.help);
