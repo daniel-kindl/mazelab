@@ -731,19 +731,99 @@ fn a_regenerate_at_the_same_seed_gives_the_same_maze() {
 // Section 13.4: auto-pause, and never auto-resume
 // ---------------------------------------------------------------------------
 
+/// A capacity inside each threshold of section 13, for a maze of 29 x 9.
+///
+/// A 100 x 24 terminal is above the layout floor and shows a maze of 24 x 6,
+/// so the maze does not fit. A 60 x 18 terminal is below the layout floor.
+const INSIDE: [(TooSmall, (u16, u16)); 2] = [
+    (TooSmall::MazeFit, (100, 24)),
+    (TooSmall::LayoutFloor, (60, 18)),
+];
+
+/// `App` decides which threshold fired from the capacity it learns and the
+/// maze on screen. The layout floor is tested first, because below the floor
+/// there is no capacity to fit a maze to.
+#[test]
+fn the_threshold_follows_the_capacity_the_caller_gives() {
+    let mut app = app();
+    assert_eq!(app.too_small, None);
+
+    for (threshold, (cols, rows)) in INSIDE {
+        assert!(app.set_capacity(capacity(cols, rows)));
+        assert_eq!(app.too_small, Some(threshold));
+    }
+
+    assert!(app.set_capacity(capacity(120, 30)));
+    assert_eq!(app.too_small, None);
+}
+
+/// A capacity that changes no threshold and no phase changes nothing the loop
+/// must draw.
+#[test]
+fn a_capacity_that_changes_no_threshold_is_not_a_change() {
+    let mut app = app();
+    assert!(!app.set_capacity(capacity(121, 31)));
+
+    app.set_capacity(capacity(100, 24));
+    assert!(!app.set_capacity(capacity(101, 24)));
+}
+
+/// An oversized `--width` starts in the maze-fit threshold, not below the
+/// layout floor. The command line states an intention, and section 13.2 does
+/// not clamp it.
+#[test]
+fn an_oversized_width_starts_in_the_maze_fit_threshold() {
+    let oversized = Startup {
+        width: Some(60),
+        ..startup()
+    };
+    let app = App::new(oversized, capacity(120, 30));
+    assert_eq!(app.too_small, Some(TooSmall::MazeFit));
+
+    let app = App::new(startup(), capacity(60, 18));
+    assert_eq!(app.too_small, Some(TooSmall::LayoutFloor));
+}
+
+/// A size key changes the maze, so it can take the maze back inside capacity.
+/// The threshold follows the maze in the same action.
+#[test]
+fn a_size_key_that_fits_the_maze_clears_the_maze_fit_threshold() {
+    let oversized = Startup {
+        width: Some(30),
+        ..startup()
+    };
+    let mut app = App::new(oversized, capacity(120, 30));
+    assert_eq!(app.too_small, Some(TooSmall::MazeFit));
+
+    assert!(app.apply(Action::Narrower));
+    assert_eq!(app.too_small, None);
+}
+
 /// Entering too small auto-pauses the run, on either threshold.
 #[test]
 fn entering_too_small_auto_pauses_the_run() {
-    for threshold in [TooSmall::MazeFit, TooSmall::LayoutFloor] {
+    for (_, (cols, rows)) in INSIDE {
         let mut app = app();
         app.apply(Action::Solve);
-        app.set_too_small(Some(threshold));
+        assert!(app.set_capacity(capacity(cols, rows)));
         assert_eq!(app.phase, Phase::Paused(Activity::Solving));
 
         let mut app = idle();
         app.apply(Action::Generate);
-        app.set_too_small(Some(threshold));
+        assert!(app.set_capacity(capacity(cols, rows)));
         assert_eq!(app.phase, Phase::Paused(Activity::Generating));
+    }
+}
+
+/// A run started inside a threshold starts paused. Stepping where nobody can
+/// see is the one outcome with no value. Section 13.4.
+#[test]
+fn a_run_started_inside_a_threshold_starts_paused() {
+    for (_, (cols, rows)) in INSIDE {
+        let mut app = app();
+        app.set_capacity(capacity(cols, rows));
+        assert!(app.apply(Action::Solve));
+        assert_eq!(app.phase, Phase::Paused(Activity::Solving));
     }
 }
 
@@ -753,8 +833,8 @@ fn entering_too_small_auto_pauses_the_run() {
 fn growing_the_terminal_back_does_not_auto_resume() {
     let mut app = app();
     app.apply(Action::Solve);
-    app.set_too_small(Some(TooSmall::LayoutFloor));
-    app.set_too_small(None);
+    app.set_capacity(capacity(60, 18));
+    assert!(app.set_capacity(capacity(120, 30)));
     assert_eq!(app.phase, Phase::Paused(Activity::Solving));
 
     assert!(app.apply(Action::PauseResume));
@@ -765,7 +845,7 @@ fn growing_the_terminal_back_does_not_auto_resume() {
 #[test]
 fn too_small_changes_no_still_phase() {
     let mut app = app();
-    app.set_too_small(Some(TooSmall::MazeFit));
+    app.set_capacity(capacity(100, 24));
     assert_eq!(app.phase, Phase::Ready);
     assert_eq!(app.too_small, Some(TooSmall::MazeFit));
 }

@@ -1,20 +1,19 @@
-//! Terminal setup, terminal teardown, the terminal guard and the call into the
-//! loop. Nothing else.
+//! Terminal setup, terminal teardown, the terminal guard, the tick loop and
+//! the keymap. Nothing else.
 //!
-//! The tick loop of section 6 lives here because the loop is what owns the
-//! terminal: it polls the input queue, it reads the clock, and it draws. The
-//! model it advances lives in [`mazelab::app`], and no application state is
-//! held here. Key codes are translated to an [`Action`] at [`action`], so
-//! `app` never sees a `KeyEvent`. That is the rule of section 1.2.
+//! The tick loop of section 6 lives here because the loop owns the terminal:
+//! it polls the input queue, it reads the clock, and it draws. The model that
+//! the loop advances lives in [`mazelab::app`], and no application state is
+//! held here. [`action`] translates a key code to an [`Action`], so `app`
+//! never sees a `KeyEvent`. That is the rule of section 1.2.
 
 use std::io;
 use std::time::{Duration, Instant};
 
 use clap::Parser;
 use mazelab::StepOutcome;
-use mazelab::app::{Action, App, TooSmall, capacity};
+use mazelab::app::{Action, App, capacity};
 use mazelab::cli::Args;
-use mazelab::maze::Maze;
 use mazelab::ui;
 use ratatui::DefaultTerminal;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent};
@@ -84,12 +83,10 @@ impl Drop for TerminalGuard {
 /// Returns the error that polling, reading or drawing the terminal gave. The
 /// guard in [`main`] restores the terminal on the way out.
 fn run(mut terminal: DefaultTerminal, args: Args) -> io::Result<()> {
-    let capacity = terminal_capacity(&terminal)?;
-    let mut app = App::new(args.into_startup(), capacity);
-    app.set_too_small(threshold(capacity, &app.maze));
+    let mut app = App::new(args.into_startup(), terminal_capacity(&terminal)?);
 
-    // The first frame is drawn before the loop. A tick draws at its end, so a
-    // still phase would otherwise show nothing until the first poll timed out.
+    // The first frame is drawn before the loop. A tick draws at its end. So
+    // without this draw, a still phase shows nothing until the first event.
     terminal.draw(|frame| ui::render(frame, &app))?;
 
     let mut dirty = false;
@@ -106,57 +103,56 @@ fn run(mut terminal: DefaultTerminal, args: Args) -> io::Result<()> {
         };
 
         if event::poll(timeout)? {
-            let was_animating = app.phase.is_animating();
+            // True when the phase is still at some point of the batch. `.`
+            // then `Space` in one batch pauses and resumes a run, and that
+            // resume must reset the timestamp too.
+            let mut was_still = !app.phase.is_animating();
 
-            // The terminal is already resized when the event that reports the
-            // resize is queued, so the size read here is the size every action
-            // in this batch must clamp against.
-            let capacity = terminal_capacity(&terminal)?;
-            app.set_capacity(capacity);
-
-            let mut changed = apply(&mut app, event::read()?);
-            // Drain the queue. Without the drain a held key produces one
+            // Drain the queue. Without the drain, a held key produces one
             // iteration of this loop for each repeat, and the animation speeds
-            // up while the key is down. The drain is bounded by what is
+            // up while the key is down. The drain stops at the end of what is
             // already queued, so input never starves the tick. Section 6.2.
-            while event::poll(Duration::ZERO)? {
-                changed |= apply(&mut app, event::read()?);
+            loop {
+                // Capacity is read again before each event. The terminal is
+                // already resized when crossterm queues the resize event. So
+                // each key clamps against the size the user sees, and a resize
+                // in the batch pauses the run before the run steps.
+                dirty |= app.set_capacity(terminal_capacity(&terminal)?);
+                was_still |= !app.phase.is_animating();
+                dirty |= apply(&mut app, event::read()?);
+                was_still |= !app.phase.is_animating();
+                if !event::poll(Duration::ZERO)? {
+                    break;
+                }
             }
 
-            // The threshold follows the terminal and the maze, and a size key
-            // changed the maze inside the batch.
-            let before = app.too_small;
-            app.set_too_small(threshold(capacity, &app.maze));
-            changed |= app.too_small != before;
-
-            // Section 6.4: a resume resets the timestamp, because keeping it
-            // means resuming after ten seconds buys ten seconds of budget and
-            // the algorithm jumps. Every way into an animating phase is an
-            // action, so this is where the reset belongs.
-            if app.phase.is_animating() && !was_animating {
+            // Section 6.4: a resume resets the timestamp. If the timestamp is
+            // kept, a resume after ten seconds buys ten seconds of budget, and
+            // the algorithm jumps. Only an action starts an animating phase,
+            // so the reset belongs here.
+            if was_still && app.phase.is_animating() {
                 last_step = Instant::now();
             }
-
-            dirty |= changed;
         }
 
         if app.phase.is_animating() {
             let elapsed = last_step.elapsed().min(MAX_ELAPSED);
             last_step = Instant::now();
             let want = app.budget.advance(elapsed);
-            // Half a frame, which leaves room for the draw. The unspent budget
-            // is discarded and never carried: carrying it guarantees that the
-            // next tick overruns too, and the debt compounds. Section 6.3.
+            // The deadline is half a frame, which leaves room for the draw.
+            // The unspent budget is discarded and never carried. A carried
+            // budget makes the next tick overrun too, and the debt compounds.
+            // Section 6.3.
             let deadline = Instant::now() + FRAME / 2;
             for i in 0..want {
                 if i % DEADLINE_CHECK_EVERY == 0 && Instant::now() > deadline {
                     app.budget.discard();
                     break;
                 }
-                // The flag is set before the step, so the step that reports
-                // `Done` marks the model dirty too. It carried the last change
-                // of the run, and `advance_phase` changes the phase after it,
-                // so a tick that ends a run must still draw.
+                // The flag is set before the step, and not after it. The step
+                // that reports `Done` can end the run, and `advance_phase`
+                // then changes the phase and can braid the maze. The tick must
+                // draw that change.
                 dirty = true;
                 if app.step() == StepOutcome::Done {
                     app.advance_phase();
@@ -171,12 +167,11 @@ fn run(mut terminal: DefaultTerminal, args: Args) -> io::Result<()> {
             dirty = false;
         }
 
-        // The deadline paces the tick, and a tick that drew nothing is paced
-        // by it too. Section 6.4 has the ticks below one step of budget change
-        // nothing and never draw, so advancing the deadline only on a draw
-        // would leave it in the past: `poll` would return at once and the loop
-        // would spin until the residue reached a step. A rung of 0.5 spins for
-        // most of two frames that way.
+        // The deadline paces every tick, also a tick that drew nothing. At a
+        // slow rung, most ticks run no step and do not draw (section 6.4). If
+        // only a draw advanced the deadline, the deadline would stay in the
+        // past. Then `poll` would return at once, and the loop would use a
+        // full core until the residue reached one step.
         let now = Instant::now();
         if next_render_deadline <= now {
             next_render_deadline = now + FRAME;
@@ -250,26 +245,4 @@ fn action(key: KeyEvent) -> Option<Action> {
 fn terminal_capacity(terminal: &DefaultTerminal) -> io::Result<Option<(u16, u16)>> {
     let size = terminal.size()?;
     Ok(capacity(size.width, size.height))
-}
-
-/// Which threshold of section 13 fired, or `None` when the maze fits.
-///
-/// **There are two thresholds, not one.** The loop decides between them and
-/// `App` learns the answer, because the loop is what reads the terminal.
-///
-/// The layout floor is the absolute one, so it is tested first: below the
-/// floor capacity is undefined, and the maze-fit question cannot be asked of a
-/// capacity that does not exist.
-///
-/// The maze-fit test of section 13 is `cols < 4W + 2` or `rows < 2H + 11`.
-/// Capacity is `(cols - 2) / 4` by `(rows - 11) / 2`, so the maze against
-/// capacity is that test and not an approximation of it.
-fn threshold(capacity: Option<(u16, u16)>, maze: &Maze) -> Option<TooSmall> {
-    let Some((width, height)) = capacity else {
-        return Some(TooSmall::LayoutFloor);
-    };
-    if maze.width() > width || maze.height() > height {
-        return Some(TooSmall::MazeFit);
-    }
-    None
 }

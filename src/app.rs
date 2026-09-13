@@ -107,10 +107,11 @@ impl Phase {
 /// Which of the two thresholds of section 13 fired.
 ///
 /// **There are two, not one.** They have different causes, different remedies
-/// and different wordings, and they must not be collapsed. The caller decides
-/// which one fired, because the decision needs the terminal size; `App` learns
-/// the answer and uses it for one thing, which is the auto-pause of section
-/// 13.4.
+/// and different wordings, and they must not be collapsed.
+///
+/// `App` decides which one fired from the capacity it learns and the maze on
+/// screen, so the decision needs no terminal. The renderer reads the answer to
+/// choose a panel, and `App` uses it for the auto-pause of section 13.4.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum TooSmall {
     /// The maze is larger than the terminal can show. The maze pane is
@@ -213,9 +214,10 @@ pub const BRAID_FACTORS: [f64; 3] = [0.00, 0.25, 0.50];
 ///
 /// **Capacity is a property of the terminal, not of the maze.** A maze can be
 /// larger than capacity, and then it is not shown: that is the maze-fit
-/// threshold of section 13, and it is the caller's to detect. Capacity is here
-/// and not in [`crate::ui`] because the model needs it twice, for the startup
-/// chain and for the clamp of section 13.2, and because it is a pure function
+/// threshold of section 13, and [`App`] detects it. Capacity is here and not
+/// in [`crate::ui`] because the model needs it three times, for the startup
+/// chain, for the clamp of section 13.2 and for the thresholds of section 13,
+/// and because it is a pure function
 /// of two integers with no terminal in it.
 ///
 /// The result is held at [`MAX_SIZE`], which a maze may not pass. Section 13.1
@@ -406,7 +408,11 @@ pub struct App {
     pub ascii: bool,
     /// The help overlay is open over the maze pane.
     pub help_open: bool,
-    /// Which threshold of section 13 the caller last reported.
+    /// Which threshold of section 13 fired, or `None` when the maze fits.
+    ///
+    /// `App` keeps it current. [`App::set_capacity`] and [`App::apply`] each
+    /// decide it again, because the first changes capacity and the second can
+    /// change the maze.
     pub too_small: Option<TooSmall>,
     /// The loop of section 6.1 breaks on this.
     ///
@@ -441,7 +447,7 @@ impl App {
     #[must_use]
     pub fn idle(startup: Startup, capacity: Option<(u16, u16)>) -> Self {
         let (width, height) = startup_size(startup, capacity);
-        Self {
+        let mut app = Self {
             phase: Phase::Idle,
             seed: startup.seed,
             maze: Maze::new(width, height),
@@ -457,7 +463,9 @@ impl App {
             quit: false,
             capacity,
             rng: rng::from_seed(startup.seed),
-        }
+        };
+        app.refresh_too_small();
+        app
     }
 
     /// The application at startup, with a maze already generated.
@@ -479,7 +487,19 @@ impl App {
     /// the model changed, so an action that is inert costs no frame. Section
     /// 13.2 has a size key at the clamp be silently inert, and this is where
     /// that shows.
+    ///
+    /// The threshold is decided again after the action. A size key or `f` can
+    /// take the maze back inside capacity. A run that `g`, `s` or `Space`
+    /// starts inside a threshold is paused at once, because stepping where
+    /// nobody can see is the one outcome with no value. Section 13.4.
     pub fn apply(&mut self, action: Action) -> bool {
+        let changed = self.act(action);
+        self.refresh_too_small() || changed
+    }
+
+    /// Applies one action and answers whether the model changed, with no
+    /// threshold decided.
+    fn act(&mut self, action: Action) -> bool {
         let (width, height) = self.size();
         match action {
             Action::Generate => {
@@ -570,32 +590,58 @@ impl App {
         }
     }
 
-    /// Learns the largest maze the terminal can show.
+    /// Learns the largest maze the terminal can show, and answers whether the
+    /// model changed.
     ///
     /// The caller computes it with [`capacity`] and passes the result in. It
     /// changes no maze on its own: section 13.2 has a resize reveal a maze
-    /// that already exists, and never generate one.
-    pub const fn set_capacity(&mut self, capacity: Option<(u16, u16)>) {
+    /// that already exists, and never generate one. It can change the
+    /// threshold and pause the run, and the answer tells the loop of section
+    /// 6.1 to draw that.
+    pub fn set_capacity(&mut self, capacity: Option<(u16, u16)>) -> bool {
         self.capacity = capacity;
+        self.refresh_too_small()
     }
 
-    /// Learns which threshold of section 13 fired, and auto-pauses a run that
-    /// entered one.
+    /// Decides which threshold of section 13 fired, auto-pauses a run inside
+    /// one, and answers whether the model changed.
     ///
     /// **Growing the terminal back does not auto-resume.** The maze reappears,
     /// still paused, and `Space` continues. MazeLab exists to make an
     /// algorithm visible one step at a time, so stepping where nobody can see
-    /// is the one outcome with no value; and auto-resume would make a dragged
+    /// is the one outcome with no value. Auto-resume would make a dragged
     /// window edge fire a stutter of pause and resume. Section 13.4.
-    pub fn set_too_small(&mut self, too_small: Option<TooSmall>) {
-        self.too_small = too_small;
-        if too_small.is_some()
+    fn refresh_too_small(&mut self) -> bool {
+        let before = (self.too_small, self.phase);
+        self.too_small = self.threshold();
+        if self.too_small.is_some()
             && let Some(activity) = self.phase.activity()
         {
             // A phase that is already paused pauses to itself, so entering the
             // second threshold from the first changes nothing.
             self.phase = Phase::Paused(activity);
         }
+        (self.too_small, self.phase) != before
+    }
+
+    /// Which threshold of section 13 fires for the maze on screen, at the
+    /// capacity `App` last learned.
+    ///
+    /// The layout floor is the absolute threshold, so it is tested first.
+    /// Below the floor there is no capacity, and a maze cannot fit a capacity
+    /// that does not exist.
+    ///
+    /// The maze-fit test of section 13 is `cols < 4W + 2` or `rows < 2H + 11`.
+    /// Capacity is `(cols - 2) / 4` by `(rows - 11) / 2`. So a maze that is
+    /// larger than capacity is exactly that test, not an approximation of it.
+    const fn threshold(&self) -> Option<TooSmall> {
+        let Some((width, height)) = self.capacity else {
+            return Some(TooSmall::LayoutFloor);
+        };
+        if self.maze.width() > width || self.maze.height() > height {
+            return Some(TooSmall::MazeFit);
+        }
+        None
     }
 
     /// The size of the maze on screen.
