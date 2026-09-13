@@ -10,11 +10,11 @@ cell, the **frontier** and the cells that a solver **expanded**.
 
 - Recursive Backtracker and Randomized Prim maze generation
 - DFS, BFS and A\* pathfinding
-- Pause, single step and 9 animation speeds, from 0.5x to 1024x
+- Pause, single step and adjustable animation speed
 - Two solver runs side by side on one maze, for comparison
 - Braiding, which adds loops so that more than one path can join two cells
 - Seeded mazes that you can reproduce
-- A maze that fills the terminal at startup, and `f` to refit it after a resize
+- Automatic terminal fitting at startup, with `f` to refit after a resize
 - An ASCII glyph set, `--ascii`, for terminals that cannot draw block glyphs
 
 ## Run it
@@ -55,7 +55,7 @@ These are the keys in the help row at the bottom of the screen:
 | `?` | Show the full keymap |
 | `q` | Quit |
 
-The full keymap also holds `Tab`, the arrow keys, `f`, `n` and `b`.
+The full keymap also includes `Tab`, the arrow keys, `f`, `n` and `b`.
 
 ## Comparing solvers
 
