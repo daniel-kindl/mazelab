@@ -1223,8 +1223,8 @@ Two forms, on a **100-column breakpoint**:
 
 | form | width | labels |
 | --- | --- | --- |
-| full, at 100 columns and above | 94 | `start goal current path frontier expanded floor wall` |
-| short, below 100 columns | 79 | `start goal cur path frontier expanded floor wall` |
+| full, at 100 columns and above | 85 | `start goal current path frontier expanded floor wall` |
+| short, below 100 columns | 74 | `start goal cur path frontier expanded floor wall` |
 
 `frontier` and `expanded` are glossary terms and are **never** shortened. Below
 100 columns the separators tighten to one space.
@@ -1232,8 +1232,18 @@ Two forms, on a **100-column breakpoint**:
 The swatch for a state whose glyph is blank — `open floor`, and `carved` in the
 generation legend — is bracketed, because a blank swatch demonstrates nothing.
 
-79 columns is the widest thing MazeLab draws, so the legend is what fixes the
-layout floor of section 13.
+The short form fits the layout floor of section 13, and a test holds its
+width.
+
+> Corrected after handoff, in commit 2378ded. The handed-off table gave 94 and
+> 79 columns, and said that 79 columns is the widest thing MazeLab draws, so the
+> legend fixes the layout floor. The two numbers were measured on the
+> prototype, whose labels were `final path` and `open floor`, whose swatches had
+> no brackets, and whose separators were two spaces in both forms. The labels,
+> the brackets and the separators above give 85 and 74, and the rules above
+> win over the numbers. The layout floor stays at 79 x 19. The widest thing
+> MazeLab now draws at the floor is the help overlay of section 7.5, at 76
+> columns.
 
 ### 7.7 The help row
 
@@ -1241,13 +1251,23 @@ Two forms, on the same 100-column breakpoint:
 
 | form | keys |
 | --- | --- |
-| full, at 100 columns and above | all 12: `g G s Space . +/- 1-2 3-5 Tab arrows f n b ?` |
+| full, at 100 columns and above | 10: `g generate  G instant  s solve  Space pause  . step  +/- speed  1-2 gen  3-5 solver  ? help  q quit` |
 | short, below 100 columns | 7: `g generate  s solve  Space pause  . step  +/- speed  ? help  q quit` |
 
-**The help row must never clip.** The full form's labels are abbreviated so
-that 12 keys fit within 100 columns; the short form is measured at 67 columns.
+**The help row must never clip.** The full form is measured at 99 columns; the
+short form is measured at 67 columns.
 The renderer selects the widest form that fits the current width, and a test
 asserts that each form fits its breakpoint.
+
+> Corrected after handoff, in commit 2378ded. The handed-off table said "all
+> 12" and listed 14 key groups, `g G s Space . +/- 1-2 3-5 Tab arrows f n b ?`,
+> with no `q`. With a label for each and two spaces between the entries, no
+> abbreviation that stays readable brings 12 of those groups within 100
+> columns: the candidates measured 107 to 118. The full form is the help row
+> of the mockup in section 7.1, with `? help` and `q quit` added. It holds
+> every entry of the short form, so no key goes away on a wider terminal.
+> `Tab`, the arrow keys, `f`, `n` and `b` are in the help overlay of section
+> 7.5.
 
 ---
 
@@ -1608,9 +1628,10 @@ remedies and different wordings, and they must not be collapsed.
   a maze is a corridor and backtracking has nowhere to happen. 4 x 4 also keeps
   the rows floor at 19, below the 80 x 24 case the layout was chosen for; at
   5 x 5 the floor would become 21 rows and an 80 x 20 terminal would be refused.
-- **Layout floor: 79 x 19.** 79 columns from the legend's short form, which is
-  the widest thing MazeLab draws and which may not be clipped. 19 rows from 10
-  rows of chrome plus the 9 a 4-cell-tall maze needs. Capacity at exactly the
+- **Layout floor: 79 x 19.** 79 columns were taken from the legend's short
+  form, which may not be clipped. Section 7.6 now measures that form at 74
+  columns, and the floor stays at 79. 19 rows from 10 rows of chrome plus the 9
+  a 4-cell-tall maze needs. Capacity at exactly the
   floor is 19 x 4, so the two floors are consistent.
 - **No interactive maximum.** Capacity already bounds anything a terminal can
   show: even 300 x 100 gives 74 x 44, about 3 200 cells. The loop of section 6

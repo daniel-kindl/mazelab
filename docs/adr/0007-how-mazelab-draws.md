@@ -116,6 +116,13 @@ The alternative was to let the band keep the long names and lift the floor to
 about 103 columns. That was rejected because it abandons the 80-column terminal
 that this layout was chosen for.
 
+> Amended after implementation, in commit 2378ded. The legend widths above were
+> measured on the prototype, before the bracketed swatch, the one-space
+> separators and the final labels. The legend as built measures 74 columns in
+> its short form, and the help overlay, at 76 columns, is the widest thing
+> MazeLab draws at the floor. The floor stays at 79 columns. SPEC.md section
+> 7.6 holds the correction.
+
 `19` rows is the 10 rows of chrome plus the 9 that a 4-cell-tall maze needs.
 **4 x 4 is the smallest maze MazeLab makes**: at three rows a maze is a corridor
 and backtracking has nowhere to happen. There is no interactive maximum, because
