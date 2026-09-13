@@ -6,10 +6,6 @@ on, its **frontier**, and the cells that a solver **expanded**.
 
 ![MazeLab generates a maze with the Recursive Backtracker, solves it with BFS, then solves it again with A*](docs/media/demo.gif)
 
-The demo is four beats on seed 7: generate, solve with BFS, swap to A\*, and
-solve again. [`docs/media/demo.tape`](docs/media/demo.tape) records it with
-[`vhs`](https://github.com/charmbracelet/vhs).
-
 ## Run it
 
 MazeLab needs Rust 1.88.0 or later.
