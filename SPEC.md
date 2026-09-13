@@ -1709,6 +1709,13 @@ the maze is oversized.
 ╰────────────────────────────────────────────╯
 ```
 
+> Corrected after handoff, in commit 7064db8. The handed-off mockup showed
+> `have  60 x 18` with two spaces, and a hint row with two spaces on its left
+> and none on its right. Both were drafting slips. Every line is centred on its
+> row, and one space separates each word, so the rows read `have 60 x 18` and
+> `│ resize, or press f to refit and regenerate │`. The tests hold the box
+> cell for cell.
+
 In the maze-fit case the box always fits, because the layout floor guarantees a
 pane of at least 79 x 9. Only the layout-floor case can go below 46 x 8.
 
