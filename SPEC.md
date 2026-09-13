@@ -1,5 +1,12 @@
 # MazeLab v1 specification
 
+> **Frozen. Superseded by the code.** This is the handoff record of MazeLab v1.
+> It records the decisions made before the first line of code, and it marks
+> each later correction in place. Where the code and this document disagree,
+> the code is correct. The README does not link this
+> document. Start from [`README.md`](README.md), [`CONTEXT.md`](CONTEXT.md) and
+> [`docs/adr/`](docs/adr/).
+
 MazeLab is a terminal application that animates maze generation and
 pathfinding. It exists to make the behavior of an algorithm visible one step at
 a time.
