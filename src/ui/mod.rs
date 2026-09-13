@@ -9,28 +9,45 @@ pub mod panel;
 pub mod stats;
 
 use ratatui::Frame;
-use ratatui::text::Line;
 
-use crate::app::App;
+use crate::app::{Activity, App, Phase};
 
-/// Draws one frame of the screen.
+/// Draws one frame of the screen of section 7.
 ///
-/// **This is a placeholder and it is not the screen of section 7.** The bands,
-/// the palette, the glyph sets, the statistics band, the legend row, the help
-/// row and the two too-small panels are the rendering issues, and each of them
-/// replaces part of this function. It draws one line so that the loop of
-/// section 6 has the call it is specified to make, and so that a run can be
-/// watched while the screen is written.
+/// The layout is the five bands of section 7.1, and it is the same at every
+/// terminal size. The glyph set is selected here, once for the frame, and
+/// every band that draws a glyph reads it from this one value, so no frame can
+/// mix the two glyph sets.
+///
+/// The legend row, the help row and the two too-small panels of section 13
+/// are not drawn yet. Their bands stay blank, and a maze that does not fit the
+/// pane is not drawn.
 pub fn render(frame: &mut Frame, app: &App) {
-    let steps = app.run.as_ref().map_or(0, |run| run.stats(&app.maze).steps);
-    let line = Line::from(format!(
-        "MazeLab  seed {}  maze {}x{}  phase {:?}  steps {steps}  \
-         [placeholder screen: g generate, s solve, Space pause, . step, q quit]",
-        app.seed,
-        app.maze.width(),
-        app.maze.height(),
-        app.phase,
-    ));
-    let area = frame.area();
-    frame.render_widget(line, area);
+    let glyphs = if app.ascii {
+        &palette::ASCII
+    } else {
+        &palette::UNICODE
+    };
+    let screen = frame.area();
+    let bands = layout::bands(screen);
+    frame.render_widget(layout::status_line(app), bands.status);
+    maze::render(app, glyphs, bands.maze, frame.buffer_mut());
+    stats::render(app, bands.stats, frame.buffer_mut());
+    if app.help_open {
+        help::render_overlay(screen, bands.maze, frame.buffer_mut());
+    }
+}
+
+/// The kind of run that the phase draws on the maze and in the band, or `None`
+/// where the phase draws no run in progress.
+///
+/// It is [`Phase::activity`], with one addition: `Solved` holds a solver run
+/// and has no activity, because nothing is left to advance, but the screen
+/// still draws that run. `Ready` answers `None`. The generation run it can
+/// hold is over.
+const fn shown_activity(phase: Phase) -> Option<Activity> {
+    match phase {
+        Phase::Solved => Some(Activity::Solving),
+        phase => phase.activity(),
+    }
 }

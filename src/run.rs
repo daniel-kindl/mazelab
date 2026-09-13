@@ -371,6 +371,30 @@ impl Run {
     }
 }
 
+/// The cell state at the display position `(dx, dy)` of a finished maze with
+/// no run shown on it.
+///
+/// The walk is the one [`Run::solver_state`] makes, with no solver to ask: the
+/// start corner is `Start`, the goal corner is `Goal`, every other cell and
+/// every passage is `Open`, and a [`DisplayCell::Wall`], and every position
+/// outside the display grid, is `Wall`.
+///
+/// The screen draws `Ready` this way. The generation run that carved the maze
+/// is over, but a generator can still answer the last cell it acted on, and a
+/// `Current` cell on a finished maze would say that a run is going on. The
+/// start and the goal are drawn, because they are where the next run goes
+/// from and to.
+#[must_use]
+pub fn ready_state(maze: &Maze, dx: u16, dy: u16) -> SolverCellState {
+    let (start, goal) = corners(maze);
+    match maze.display_cell(dx, dy) {
+        DisplayCell::Cell(c) if c == start => SolverCellState::Start,
+        DisplayCell::Cell(c) if c == goal => SolverCellState::Goal,
+        DisplayCell::Cell(_) | DisplayCell::Passage(..) => SolverCellState::Open,
+        DisplayCell::Wall => SolverCellState::Wall,
+    }
+}
+
 /// The offset of a cell in a grid that holds one flag for each cell of `maze`,
 /// or `None` when the cell is outside it.
 ///
@@ -386,7 +410,13 @@ fn offset(maze: &Maze, c: Cell) -> Option<usize> {
 /// Section 15 fixes the start and the goal there for v1, and holds them as
 /// data on the run rather than inside a solver, so that moving them later is a
 /// change to this function and to the keymap alone.
-fn corners(maze: &Maze) -> (Cell, Cell) {
+///
+/// It is public because the screen reads the start and the goal from here when
+/// no solver run is on screen: the maze column of the statistics band, and
+/// [`ready_state`]. This function is the one place the two corners are
+/// decided.
+#[must_use]
+pub fn corners(maze: &Maze) -> (Cell, Cell) {
     (
         Cell { x: 0, y: 0 },
         Cell {
