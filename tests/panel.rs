@@ -5,59 +5,21 @@
 //! pane only, and the rest of the chrome keeps rendering. The layout-floor
 //! panel replaces the whole screen. The two have different wordings.
 
+mod common;
+
+use common::{app_on, assert_screen, draw, row, screen_rows, startup};
 use mazelab::app::{Action, App, Phase, Startup, capacity};
 use mazelab::maze::Maze;
-use mazelab::ui::{self, panel};
-use ratatui::Terminal;
-use ratatui::backend::TestBackend;
+use mazelab::ui::panel;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Widget;
 
-/// The startup options every test below starts from: a fixed seed, the
-/// Recursive Backtracker and A\*, which are the defaults of section 9.
-fn startup() -> Startup {
-    Startup {
-        seed: 7,
-        width: None,
-        height: None,
-        ascii: false,
-        generator_ix: 0,
-        solver_ix: 2,
-    }
-}
-
-/// A terminal of `cols` x `rows` with one frame of `app` drawn on it.
-fn terminal(app: &App, cols: u16, rows: u16) -> Terminal<TestBackend> {
-    // `TestBackend::Error` is `Infallible`, so the two patterns are
-    // irrefutable and no test helper here returns a `Result`.
-    let Ok(mut terminal) = Terminal::new(TestBackend::new(cols, rows));
-    let Ok(_) = terminal.draw(|frame| ui::render(frame, app));
-    terminal
-}
-
-/// Draws one frame of `app` on a terminal of `cols` x `rows`.
-fn draw(app: &App, cols: u16, rows: u16) -> Buffer {
-    terminal(app, cols, rows).backend().buffer().clone()
-}
-
 /// The application at startup on a terminal of `cols` x `rows`, drawn there.
 fn draw_on(cols: u16, rows: u16) -> Buffer {
-    draw(&App::new(startup(), capacity(cols, rows)), cols, rows)
-}
-
-/// The symbols of one screen row, joined.
-fn row(buffer: &Buffer, y: u16) -> String {
-    (0..buffer.area.width)
-        .map(|x| buffer[(x, y)].symbol())
-        .collect()
-}
-
-/// Every row of the buffer, joined.
-fn screen_rows(buffer: &Buffer) -> Vec<String> {
-    (0..buffer.area.height).map(|y| row(buffer, y)).collect()
+    draw(&app_on(cols, rows), cols, rows)
 }
 
 /// The layout-floor panel of section 13.5, at a terminal of 60 x 18.
@@ -91,9 +53,7 @@ fn below_the_layout_floor_the_whole_screen_is_the_panel() {
             Span::raw(" ".repeat(7)),
         ]);
     }
-    terminal(&app, 60, 18)
-        .backend()
-        .assert_buffer_lines(expected);
+    assert_screen(&app, 60, 18, expected);
 }
 
 // ---------------------------------------------------------------------------

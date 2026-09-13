@@ -5,20 +5,13 @@
 //! arrived intact, so these tests hold every entry, its glyph, its colour and
 //! its label. ADR 0007.
 
+mod common;
+
+use common::{draw, row, text};
 use mazelab::StepOutcome;
 use mazelab::app::{Action, Activity, App, Phase, Startup, capacity};
-use mazelab::ui::{self, legend, palette};
-use ratatui::Terminal;
-use ratatui::backend::TestBackend;
+use mazelab::ui::{legend, palette};
 use ratatui::style::{Color, Modifier};
-
-/// The text of a line, with no style.
-fn text(line: &ratatui::text::Line) -> String {
-    line.spans
-        .iter()
-        .map(|span| span.content.as_ref())
-        .collect()
-}
 
 #[test]
 fn the_short_solver_legend_measures_74_columns() {
@@ -122,12 +115,8 @@ const GENERATION: [Entry; 4] = [
 /// other phase draws with the solver cell states and shows the solver legend.
 fn apps_in_every_phase(ascii: bool, cols: u16) -> Vec<(App, &'static [Entry])> {
     let startup = Startup {
-        seed: 7,
-        width: None,
-        height: None,
         ascii,
-        generator_ix: 0,
-        solver_ix: 2,
+        ..common::startup()
     };
     let capacity = capacity(cols, 24);
     let idle = App::idle(startup, capacity);
@@ -172,13 +161,8 @@ fn apps_in_every_phase(ascii: bool, cols: u16) -> Vec<(App, &'static [Entry])> {
 /// each in its glyph, its colour, its weight and the label of the form for
 /// `cols`.
 fn assert_legend(app: &App, cols: u16, entries: &[Entry]) {
-    // `TestBackend::Error` is `Infallible`, so the two patterns are
-    // irrefutable.
-    let Ok(mut terminal) = Terminal::new(TestBackend::new(cols, 24));
-    let Ok(_) = terminal.draw(|frame| ui::render(frame, app));
-    let buffer = terminal.backend().buffer();
-    let symbols: Vec<&str> = (0..cols).map(|x| buffer[(x, 22)].symbol()).collect();
-    let drawn = symbols.concat();
+    let buffer = draw(app, cols, 24);
+    let drawn = row(&buffer, 22);
 
     let separator = if cols >= 100 { "  " } else { " " };
     let mut expected = String::new();

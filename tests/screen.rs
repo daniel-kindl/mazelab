@@ -6,54 +6,16 @@
 //! no terminal. No test can render a glyph on a real font; these tests hold
 //! where each glyph goes and which glyph it is.
 
+mod common;
+
+use common::{app_on, assert_screen, draw, row, startup};
 use mazelab::StepOutcome;
 use mazelab::app::{Action, App, Startup, capacity};
-use mazelab::ui::{self, layout};
-use ratatui::Terminal;
-use ratatui::backend::TestBackend;
+use mazelab::ui::layout;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-
-/// The startup options every test below starts from: a fixed seed, the
-/// Recursive Backtracker and A\*, which are the defaults of section 9.
-fn startup() -> Startup {
-    Startup {
-        seed: 7,
-        width: None,
-        height: None,
-        ascii: false,
-        generator_ix: 0,
-        solver_ix: 2,
-    }
-}
-
-/// The application at startup on a terminal of `cols` x `rows`.
-fn app_on(cols: u16, rows: u16) -> App {
-    App::new(startup(), capacity(cols, rows))
-}
-
-/// A terminal of `cols` x `rows` with one frame of `app` drawn on it.
-fn terminal(app: &App, cols: u16, rows: u16) -> Terminal<TestBackend> {
-    // `TestBackend::Error` is `Infallible`, so the two patterns are
-    // irrefutable and no test helper here returns a `Result`.
-    let Ok(mut terminal) = Terminal::new(TestBackend::new(cols, rows));
-    let Ok(_) = terminal.draw(|frame| ui::render(frame, app));
-    terminal
-}
-
-/// Draws one frame of `app` on a terminal of `cols` x `rows`.
-fn draw(app: &App, cols: u16, rows: u16) -> Buffer {
-    terminal(app, cols, rows).backend().buffer().clone()
-}
-
-/// The symbols of one screen row, joined.
-fn row(buffer: &Buffer, y: u16) -> String {
-    (0..buffer.area.width)
-        .map(|x| buffer[(x, y)].symbol())
-        .collect()
-}
 
 /// The symbols of one screen column between two rows, inclusive, joined.
 fn column(buffer: &Buffer, x: u16, rows: std::ops::RangeInclusive<u16>) -> String {
@@ -562,43 +524,48 @@ fn a_small_solved_maze_fills_the_screen_at_the_layout_floor() {
     assert!(app.apply(Action::ChooseSolver(1)));
     solve(&mut app);
 
-    terminal(&app, 79, 19).backend().assert_buffer_lines([
-        Line::from(
-            "MazeLab  seed 2  gen Recursive Backtracker  solver BFS  phase Solved  speed 8x",
-        ),
-        maze_row("██████████████████████"),
-        maze_row("██SS▓▓▓▓▓▓▓▓██      ██"),
-        maze_row("██████████▓▓██  ██████"),
-        maze_row("██      ██▓▓██▒▒░░░░██"),
-        maze_row("██████  ██▓▓██████░░██"),
-        maze_row("██░░░░▒▒██▓▓██▓▓▓▓▓▓██"),
-        maze_row("██░░██████▓▓██▓▓██▓▓██"),
-        maze_row("██░░░░░░░░▓▓▓▓▓▓██GG██"),
-        maze_row("██████████████████████"),
-        Line::from(
-            "┌ this run ──────────────┐┌ previous run ───────────┐┌ maze ──────────────────┐",
-        ),
-        Line::from(
-            "│algorithm            BFS││algorithm             DFS││maze                 5x4│",
-        ),
-        Line::from(
-            "│step                  14││step                   16││braid               0.00│",
-        ),
-        Line::from(
-            "│expanded              14││expanded               16││carved                20│",
-        ),
-        Line::from(
-            "│frontier               2││frontier                1││start                0,0│",
-        ),
-        Line::from(
-            "│path len              10││path len               10││equal path              │",
-        ),
-        Line::from(
-            "└────────────────────────┘└─────────────────────────┘└────────────────────────┘",
-        ),
-        legend_row(),
-        help_row(),
-    ]);
+    assert_screen(
+        &app,
+        79,
+        19,
+        [
+            Line::from(
+                "MazeLab  seed 2  gen Recursive Backtracker  solver BFS  phase Solved  speed 8x",
+            ),
+            maze_row("██████████████████████"),
+            maze_row("██SS▓▓▓▓▓▓▓▓██      ██"),
+            maze_row("██████████▓▓██  ██████"),
+            maze_row("██      ██▓▓██▒▒░░░░██"),
+            maze_row("██████  ██▓▓██████░░██"),
+            maze_row("██░░░░▒▒██▓▓██▓▓▓▓▓▓██"),
+            maze_row("██░░██████▓▓██▓▓██▓▓██"),
+            maze_row("██░░░░░░░░▓▓▓▓▓▓██GG██"),
+            maze_row("██████████████████████"),
+            Line::from(
+                "┌ this run ──────────────┐┌ previous run ───────────┐┌ maze ──────────────────┐",
+            ),
+            Line::from(
+                "│algorithm            BFS││algorithm             DFS││maze                 5x4│",
+            ),
+            Line::from(
+                "│step                  14││step                   16││braid               0.00│",
+            ),
+            Line::from(
+                "│expanded              14││expanded               16││carved                20│",
+            ),
+            Line::from(
+                "│frontier               2││frontier                1││start                0,0│",
+            ),
+            Line::from(
+                "│path len              10││path len               10││equal path              │",
+            ),
+            Line::from(
+                "└────────────────────────┘└─────────────────────────┘└────────────────────────┘",
+            ),
+            legend_row(),
+            help_row(),
+        ],
+    );
 }
 
 /// The short solver legend of section 7.6, in the colours of section 7.4.
