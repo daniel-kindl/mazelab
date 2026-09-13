@@ -1200,6 +1200,16 @@ the whole table above. While it is open, `Esc` closes the overlay instead of
 quitting and `?` toggles it; every other key acts normally and leaves the
 overlay open. The overlay changes no phase, so an animation continues behind it.
 
+> Corrected after handoff, in commit 55d8f59. The table above is 87 columns
+> wide as an overlay row, and section 7.6 makes 79 columns the widest thing
+> MazeLab draws. The overlay therefore shortens the notes of `.`, `n` and `b`
+> and names the `b` action "cycle braid factor", so that its box is 76 columns
+> wide and the meaning of each row stays the same. The box is 18 rows, and the
+> maze pane has 14 rows at 80 x 24 and 9 at the layout floor. Where the pane is
+> shorter than the box, the box starts at the top of the pane and covers the
+> chrome below it. It never covers the status row, because section 7.2 keeps
+> the seed on screen.
+
 ### 7.6 The legend row
 
 The legend is **the in-application evidence** that the glyphs and the colours
